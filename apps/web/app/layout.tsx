@@ -1,20 +1,10 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "./context/auth-context";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-});
-
 export const metadata: Metadata = {
-  title: "Bank Management System",
-  description: "Enterprise Bank Management and Account Services",
+  title: "State Bank of India - Retail Internet Banking System",
+  description: "Secure Core Banking & NetBanking Portal. Online SBI / Bharat National Bank account services, fund transfers, e-deposits, and statements.",
 };
 
 export default function RootLayout({
@@ -24,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="bg-[#d4dfea] antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -1,14 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --bank-blue-dark: #002b49;
+  --bank-blue: #004c8f;
+  --bank-blue-medium: #006699;
+  --bank-blue-light: #dbe8f5;
+  --bank-blue-subtle: #f0f4f9;
+  --bank-header-gradient: linear-gradient(180deg, #004b87 0%, #002b49 100%);
+  --bank-nav-gradient: linear-gradient(180deg, #1967a8 0%, #004b87 100%);
+  --bank-btn-gradient: linear-gradient(180deg, #0066b3 0%, #004480 100%);
+  --bank-yellow: #f8991d;
+  --bank-yellow-light: #fff8e6;
+  --bank-border: #99b4d1;
+  --bank-border-dark: #6688aa;
+  --bank-border-table: #b0c4de;
+  --bank-red: #a30000;
+  --bank-red-dark: #800000;
+  --bank-green: #006600;
+  --bank-bg-gray: #e8ecf1;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: #222222;
+  background-color: #eef2f6;
+  font-family: Arial, Tahoma, Verdana, 'Trebuchet MS', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -16,4 +33,298 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Classic Retro Banking Styles */
+.bank-page-container {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  background-color: #ffffff;
+  border-left: 1px solid #708ea8;
+  border-right: 1px solid #708ea8;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.bank-top-utility {
+  background-color: #00223d;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-bottom: 1px solid #001729;
+}
+
+.bank-top-utility a {
+  color: #cce0ff;
+  text-decoration: none;
+}
+.bank-top-utility a:hover {
+  text-decoration: underline;
+  color: #ffffff;
+}
+
+.bank-header-main {
+  background: linear-gradient(180deg, #004c8f 0%, #002d54 100%);
+  color: #ffffff;
+  padding: 8px 14px;
+  border-bottom: 3px solid #f8991d;
+}
+
+.bank-nav-bar {
+  background: linear-gradient(180deg, #1c6aa9 0%, #084980 100%);
+  border-bottom: 2px solid #002b4d;
+  padding: 0 6px;
+}
+
+.bank-nav-tab {
+  display: inline-block;
+  padding: 7px 14px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+  text-decoration: none;
+  border-right: 1px solid #0b3d68;
+  border-left: 1px solid #3380be;
+  transition: background 0.15s ease;
+}
+
+.bank-nav-tab:hover {
+  background: #003666;
+  color: #ffeb99;
+}
+
+.bank-nav-tab.active {
+  background: #ffffff;
+  color: #003366;
+  border-top: 2px solid #f8991d;
+  margin-top: -2px;
+  border-left: 1px solid #99b4d1;
+  border-right: 1px solid #99b4d1;
+  border-bottom: 1px solid #ffffff;
+}
+
+.bank-ticker {
+  background-color: #fff9e6;
+  border-bottom: 1px solid #eedd82;
+  border-top: 1px solid #eedd82;
+  color: #8b0000;
+  font-size: 11.5px;
+  font-weight: bold;
+  padding: 4px 10px;
+}
+
+.bank-panel-box {
+  background-color: #ffffff;
+  border: 1px solid #99b4d1;
+  margin-bottom: 14px;
+}
+
+.bank-panel-header {
+  background: linear-gradient(180deg, #2b70a8 0%, #175486 100%);
+  color: #ffffff;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  border-bottom: 1px solid #0f3d64;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bank-panel-header-secondary {
+  background: linear-gradient(180deg, #e6edf5 0%, #cfe0f1 100%);
+  color: #003366;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  border-bottom: 1px solid #99b4d1;
+}
+
+.bank-sidebar-menu {
+  background-color: #f4f7fa;
+  border: 1px solid #99b4d1;
+}
+
+.bank-sidebar-cat-title {
+  background: linear-gradient(180deg, #004c8f 0%, #003366 100%);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 11.5px;
+  padding: 5px 8px;
+  border-top: 1px solid #3377aa;
+  border-bottom: 1px solid #001f3f;
+}
+
+.bank-sidebar-link {
+  display: block;
+  padding: 5px 10px 5px 16px;
+  color: #003366;
+  font-size: 11px;
+  border-bottom: 1px dotted #b0c4de;
+  text-decoration: none;
+  background-color: #ffffff;
+}
+
+.bank-sidebar-link:hover {
+  background-color: #e6effa;
+  color: #990000;
+  text-decoration: underline;
+}
+
+.bank-sidebar-link.active {
+  background-color: #dce7f5;
+  color: #8b0000;
+  font-weight: bold;
+  border-left: 4px solid #f8991d;
+}
+
+/* Classic Table */
+.bank-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  border: 1px solid #99b4d1;
+}
+
+.bank-table th {
+  background: linear-gradient(180deg, #e2ecf7 0%, #c8daf0 100%);
+  color: #003366;
+  font-weight: bold;
+  padding: 6px 8px;
+  border: 1px solid #99b4d1;
+  text-align: left;
+}
+
+.bank-table td {
+  padding: 5px 8px;
+  border: 1px solid #b8cde4;
+}
+
+.bank-table tr:nth-child(even) {
+  background-color: #f7f9fc;
+}
+
+.bank-table tr:hover {
+  background-color: #fff9e6;
+}
+
+/* Classic Form Controls */
+.bank-input {
+  font-family: Arial, Tahoma, sans-serif;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid #7f9db9;
+  background-color: #ffffff;
+  color: #111111;
+  border-radius: 0;
+}
+
+.bank-input:focus {
+  outline: 1px solid #005599;
+  border-color: #005599;
+  background-color: #fffffa;
+}
+
+.bank-btn {
+  font-family: Arial, Tahoma, sans-serif;
+  font-size: 11.5px;
+  font-weight: bold;
+  padding: 4px 12px;
+  border: 1px solid #336699;
+  background: linear-gradient(180deg, #1f6ea9 0%, #0a4d80 100%);
+  color: #ffffff;
+  cursor: pointer;
+  border-radius: 2px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.bank-btn:hover {
+  background: linear-gradient(180deg, #2b7bb8 0%, #105990 100%);
+  border-color: #1a4d80;
+}
+
+.bank-btn:active {
+  background: #08406f;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.bank-btn-secondary {
+  font-family: Arial, Tahoma, sans-serif;
+  font-size: 11.5px;
+  font-weight: bold;
+  padding: 4px 12px;
+  border: 1px solid #888888;
+  background: linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 100%);
+  color: #222222;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.bank-btn-secondary:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 100%);
+}
+
+.bank-btn-danger {
+  font-family: Arial, Tahoma, sans-serif;
+  font-size: 11.5px;
+  font-weight: bold;
+  padding: 4px 12px;
+  border: 1px solid #800000;
+  background: linear-gradient(180deg, #c41c1c 0%, #8a0c0c 100%);
+  color: #ffffff;
+  cursor: pointer;
+  border-radius: 2px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.bank-btn-danger:hover {
+  background: linear-gradient(180deg, #db2424 0%, #9e1010 100%);
+}
+
+/* Security advisory box */
+.bank-security-notice {
+  background-color: #fffdec;
+  border: 1px solid #eedd82;
+  padding: 8px 10px;
+  color: #4a3c00;
+  font-size: 11px;
+}
+
+/* Classic virtual keyboard button */
+.bank-vk-btn {
+  font-family: monospace, Arial;
+  font-size: 12px;
+  font-weight: bold;
+  background: #eef2f5;
+  border: 1px solid #7f9db9;
+  border-radius: 2px;
+  padding: 4px 7px;
+  cursor: pointer;
+  user-select: none;
+}
+.bank-vk-btn:hover {
+  background: #dbe8f5;
+  border-color: #004c8f;
+}
+.bank-vk-btn:active {
+  background: #b8cde4;
+}
+
+/* Marquee simulation */
+@keyframes bank-marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.bank-marquee-content {
+  display: inline-block;
+  white-space: nowrap;
+  animation: bank-marquee 32s linear infinite;
+}
+
+.bank-marquee-content:hover {
+  animation-play-state: paused;
 }

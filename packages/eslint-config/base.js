@@ -4,6 +4,8 @@ import eslintConfigPrettier from "eslint-config-prettier";
 import turboPlugin from "eslint-plugin-turbo";
 import onlyWarn from "eslint-plugin-only-warn";
 
+const babelPresetTypescript = import.meta.resolve("@babel/preset-typescript");
+
 /**
  * A shared ESLint configuration for the repository.
  *
@@ -18,7 +20,7 @@ export const config = [
       parserOptions: {
         requireConfigFile: false,
         babelOptions: {
-          presets: ["@babel/preset-typescript"],
+          presets: [babelPresetTypescript],
         },
       },
     },
