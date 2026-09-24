@@ -2,7 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiUrl = process.env.API_URL || 'http://localhost:5001';
     return [
       {
         source: '/api/:path*',
