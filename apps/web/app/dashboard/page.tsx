@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/auth-context';
 import { BankHeader } from '../components/BankHeader';
 import { BankFooter } from '../components/BankFooter';
+import { RetroDialog } from '../components/RetroDialog';
 import {
   BankAccount,
   BankTransaction,
@@ -24,6 +25,15 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<string>('accounts');
   const [sessionSeconds, setSessionSeconds] = useState(300); // 5 minutes countdown
   const [lastLoginTime] = useState('23-Sep-2026 18:32:14 IST');
+
+  // Dialog state
+  const [dialogNotice, setDialogNotice] = useState<string | null>(null);
+  const [dialogTitle, setDialogTitle] = useState<string>('State Bank Notice');
+
+  const showNotice = useCallback((message: string, title: string = 'State Bank Internet Banking Notice') => {
+    setDialogTitle(title);
+    setDialogNotice(message);
+  }, []);
 
   // Banking data state per user
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -116,7 +126,6 @@ export default function DashboardPage() {
       setSessionSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          alert('Session Expired: Your Internet Banking session has timed out due to inactivity.');
           logout().then(() => router.replace('/login'));
           return 0;
         }
@@ -328,12 +337,12 @@ export default function DashboardPage() {
     const amt = parseFloat(fdAmount);
 
     if (isNaN(amt) || amt < 1000) {
-      alert('Minimum deposit amount for opening e-Fixed Deposit is ₹ 1,000.00');
+      showNotice('Minimum deposit amount for opening e-Fixed Deposit is ₹ 1,000.00', 'Term Deposit Validation');
       return;
     }
 
     if (!currentAccount || amt > currentAccount.balance) {
-      alert('Insufficient balance in your Savings Account to fund this deposit!');
+      showNotice('Insufficient balance in your Savings Account to fund this deposit!', 'Insufficient Funds');
       return;
     }
 
@@ -394,19 +403,19 @@ export default function DashboardPage() {
     setBenSuccessNotice(null);
 
     if (!newBenName.trim()) {
-      alert('Beneficiary Name is required');
+      showNotice('Beneficiary Name is required.', 'Beneficiary Validation');
       return;
     }
     if (!newBenAccount.trim() || newBenAccount.length < 8) {
-      alert('Please enter a valid account number');
+      showNotice('Please enter a valid account number.', 'Beneficiary Validation');
       return;
     }
     if (newBenAccount !== newBenConfirmAccount) {
-      alert('Account numbers do not match');
+      showNotice('Account numbers do not match.', 'Beneficiary Validation');
       return;
     }
     if (!newBenIfsc.trim()) {
-      alert('IFSC Code is required');
+      showNotice('IFSC Code is required.', 'Beneficiary Validation');
       return;
     }
 
@@ -467,7 +476,7 @@ export default function DashboardPage() {
   const handleStopCheque = (e: React.FormEvent) => {
     e.preventDefault();
     if (!stopChequeNo.trim() || stopChequeNo.length !== 6) {
-      alert('Please enter valid 6-digit cheque number');
+      showNotice('Please enter valid 6-digit cheque number', 'Cheque Validation');
       return;
     }
 
@@ -720,7 +729,10 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    alert('Interest Certificate (Form 16A) for FY 2025-2026 generated. Total interest credited: ₹ 1,210.75. TDS deducted: ₹ 0.00.');
+                    showNotice(
+                      'Interest Certificate (Form 16A) for FY 2025-2026 has been generated.\n• Total Interest Credited: ₹ 1,210.75\n• TDS Deducted: ₹ 0.00 (Exempt under Sec 194A)\n• Status: Dispatched to registered email.',
+                      'Form 16A / TDS Certificate'
+                    );
                   }}
                   className="bank-sidebar-link w-full text-left"
                 >
@@ -2086,7 +2098,7 @@ export default function DashboardPage() {
                       <form
                         onSubmit={(e) => {
                           e.preventDefault();
-                          alert('Profile Password updated successfully! Stored securely in CBS auth vault.');
+                          showNotice('Profile Password updated successfully! Stored securely in CBS auth vault.', 'Profile Password Changed');
                         }}
                         className="space-y-2"
                       >
@@ -2191,7 +2203,7 @@ export default function DashboardPage() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => alert('Batch CLG-2026-0924-B1 audit trail downloaded.')}
+                              onClick={() => showNotice('Batch CLG-2026-0924-B1 audit trail downloaded: 4,120 transactions reconciled.', 'Inter-Branch Clearing Log')}
                               className="bank-btn text-[10px] px-2 py-0.5"
                             >
                               Audit Log
@@ -2209,7 +2221,7 @@ export default function DashboardPage() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => alert('Batch CLG-2026-0924-B2 audit trail downloaded.')}
+                              onClick={() => showNotice('Batch CLG-2026-0924-B2 audit trail downloaded: 1,840 transactions reconciled.', 'RBI NEFT Clearing Log')}
                               className="bank-btn text-[10px] px-2 py-0.5"
                             >
                               Audit Log
@@ -2223,7 +2235,7 @@ export default function DashboardPage() {
                   <div className="pt-2 border-t border-slate-200 flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => alert('End of Day (EOD) dry run executed. All branch ledgers in balance.')}
+                      onClick={() => showNotice('End of Day (EOD) dry run executed successfully.\n• Total Accounts Audited: 14,291\n• All branch general ledgers in balance.\n• Day status marked: BALANCED.', 'CBS EOD Reconciliation Check')}
                       className="bank-btn px-4 py-1.5 text-xs font-bold bg-purple-900 text-white"
                     >
                       Run EOD Day-End Reconciliation Check »
@@ -2237,6 +2249,14 @@ export default function DashboardPage() {
       </div>
 
       <BankFooter />
+
+      {/* Info Dialog */}
+      <RetroDialog
+        isOpen={!!dialogNotice}
+        title={dialogTitle}
+        message={dialogNotice || ''}
+        onClose={() => setDialogNotice(null)}
+      />
     </div>
   );
 }

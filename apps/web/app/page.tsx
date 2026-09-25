@@ -1,13 +1,21 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { BankHeader } from './components/BankHeader';
 import { BankFooter } from './components/BankFooter';
+import { RetroDialog } from './components/RetroDialog';
 import { useAuth } from './context/auth-context';
 
 export default function Home() {
   const { user } = useAuth();
+  const [dialogNotice, setDialogNotice] = useState<string | null>(null);
+  const [dialogTitle, setDialogTitle] = useState<string>('State Bank Online Notice');
+
+  const showNotice = (title: string, message: string) => {
+    setDialogTitle(title);
+    setDialogNotice(message);
+  };
 
   return (
     <div className="bank-page-container">
@@ -132,56 +140,66 @@ export default function Home() {
                 <span>⚡ Quick Banking Links</span>
               </div>
               <div className="divide-y divide-slate-200 text-[11px]">
-                <a
-                  href="#sb-account"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Online Savings Bank Account opening with Video KYC is available 24x7.');
-                  }}
-                  className="block px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000]"
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      'Online SB Account Opening',
+                      'Online Savings Bank Account opening with Video KYC is available 24x7. Keep your Aadhaar and original PAN card ready for video verification.'
+                    )
+                  }
+                  className="w-full text-left px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000] bg-transparent border-0 cursor-pointer block text-[11px]"
                 >
                   &rsaquo; Apply for Savings Bank Account Online (Video KYC)
-                </a>
-                <a
-                  href="#doorstep"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Doorstep Banking Services: Cash pickup, cash delivery, cheque pickup available for senior citizens.');
-                  }}
-                  className="block px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000]"
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      'Doorstep Banking Services (DSB)',
+                      'Doorstep Banking Services:\nCash pickup, cash delivery, cheque pickup, and digital life certificate submission are available for senior citizens and differently-abled customers.'
+                    )
+                  }
+                  className="w-full text-left px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000] bg-transparent border-0 cursor-pointer block text-[11px]"
                 >
                   &rsaquo; Doorstep Banking Services (DSB)
-                </a>
-                <a
-                  href="#form15"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Form 15G / 15H submission for Nil TDS deduction on Fixed Deposit interest.');
-                  }}
-                  className="block px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000]"
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      'Form 15G / 15H Submission',
+                      'Form 15G / 15H submission for Nil TDS deduction on Fixed Deposit interest is available annually for eligible resident individuals and senior citizens.'
+                    )
+                  }
+                  className="w-full text-left px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000] bg-transparent border-0 cursor-pointer block text-[11px]"
                 >
                   &rsaquo; Online Submission of Form 15G / Form 15H
-                </a>
-                <a
-                  href="#positivepay"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Positive Pay System (PPS) is mandatory for cheques valued at ₹50,000 and above.');
-                  }}
-                  className="block px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000]"
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      'Positive Pay System (PPS)',
+                      'Positive Pay System (PPS) is mandatory for cheques valued at ₹50,000 and above. Customers must submit cheque details before issuing to payee.'
+                    )
+                  }
+                  className="w-full text-left px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000] bg-transparent border-0 cursor-pointer block text-[11px]"
                 >
                   &rsaquo; Positive Pay System (PPS) for Cheques &ge; ₹50,000
-                </a>
-                <a
-                  href="#debitcard"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Manage Debit Card limits and International usage through NetBanking.');
-                  }}
-                  className="block px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000]"
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      'Debit Card Services',
+                      'Manage Debit Card limits, toggle international eCommerce usage, or temporarily block card directly through your NetBanking portal.'
+                    )
+                  }
+                  className="w-full text-left px-3 py-2 text-[#004c8f] hover:bg-[#eef3f8] hover:text-[#990000] bg-transparent border-0 cursor-pointer block text-[11px]"
                 >
                   &rsaquo; Block ATM / Debit Card or Reset ATM PIN
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -195,22 +213,54 @@ export default function Home() {
               </div>
               <div className="p-3 bg-white">
                 <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer">
+                  <div
+                    onClick={() =>
+                      showNotice(
+                        '24x7 Funds Transfer',
+                        'Transfer funds instantly across all Indian banks via IMPS 24x7, NEFT, and RTGS with real-time UTR generation.'
+                      )
+                    }
+                    className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer"
+                  >
                     <span className="text-xl">💸</span>
                     <div className="font-bold text-[#003366] text-xs mt-1">24&times;7 Funds Transfer</div>
                     <div className="text-[10px] text-slate-500">IMPS, NEFT &amp; RTGS</div>
                   </div>
-                  <div className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer">
+                  <div
+                    onClick={() =>
+                      showNotice(
+                        'e-Fixed Deposit (FD)',
+                        'Open Term Deposits online with attractive interest rates up to 7.60% p.a. Cumulative (e-STDR) and quarterly payout (e-TDR) options available.'
+                      )
+                    }
+                    className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer"
+                  >
                     <span className="text-xl">📈</span>
                     <div className="font-bold text-[#003366] text-xs mt-1">e-Fixed Deposit (FD)</div>
                     <div className="text-[10px] text-slate-500">Earn up to 7.60% p.a.</div>
                   </div>
-                  <div className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer">
+                  <div
+                    onClick={() =>
+                      showNotice(
+                        'Instant Digital Passbook',
+                        'View your transaction history, debits, credits, and export statements to CSV or print directly from your account dashboard.'
+                      )
+                    }
+                    className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer"
+                  >
                     <span className="text-xl">📖</span>
                     <div className="font-bold text-[#003366] text-xs mt-1">Instant Passbook</div>
                     <div className="text-[10px] text-slate-500">Download Statements</div>
                   </div>
-                  <div className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer">
+                  <div
+                    onClick={() =>
+                      showNotice(
+                        'Cheque Book Services',
+                        'Request personalised cheque books delivered to your CBS address via Speed Post, or issue immediate stop cheque payment markers.'
+                      )
+                    }
+                    className="border border-[#b8cde4] bg-[#f7fafd] p-2 hover:bg-[#eef5fc] cursor-pointer"
+                  >
                     <span className="text-xl">✉️</span>
                     <div className="font-bold text-[#003366] text-xs mt-1">Cheque Book Services</div>
                     <div className="text-[10px] text-slate-500">Request &amp; Stop Payment</div>
@@ -297,16 +347,18 @@ export default function Home() {
                 </tbody>
               </table>
               <div className="p-1.5 text-center bg-[#f0f4f8] border-t border-[#ccd9e8]">
-                <a
-                  href="#all-rates"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Detailed Interest Rate schedules are published on branch notice boards.');
-                  }}
-                  className="text-[10px] text-[#004c8f] hover:underline font-bold"
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotice(
+                      'Complete Interest Schedule',
+                      'Detailed Interest Rate Schedule:\n• Savings Bank (all balances): 2.70% p.a.\n• Term Deposit (7-45 days): 3.50% p.a.\n• Term Deposit (46-179 days): 4.75% p.a.\n• Term Deposit (180-364 days): 5.75% p.a.\n• Term Deposit (1-2 years): 6.80% p.a.\n• Term Deposit (2-3 years): 7.10% p.a.\n• Senior Citizens enjoy +0.50% on all domestic tenures.'
+                    )
+                  }
+                  className="text-[10px] text-[#004c8f] hover:underline font-bold bg-transparent border-0 cursor-pointer"
                 >
                   View Complete Interest Schedule &raquo;
-                </a>
+                </button>
               </div>
             </div>
 
@@ -364,6 +416,14 @@ export default function Home() {
       </main>
 
       <BankFooter />
+
+      {/* Info Dialog */}
+      <RetroDialog
+        isOpen={!!dialogNotice}
+        title={dialogTitle}
+        message={dialogNotice || ''}
+        onClose={() => setDialogNotice(null)}
+      />
     </div>
   );
 }

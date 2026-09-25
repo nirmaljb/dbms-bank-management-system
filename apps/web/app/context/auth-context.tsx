@@ -22,6 +22,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentUser = await fetchMe();
       setUser(currentUser);
+    } catch {
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -29,6 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshUser();
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+    return () => clearTimeout(safetyTimer);
   }, [refreshUser]);
 
   const login = async (input: { email: string; password: string }) => {

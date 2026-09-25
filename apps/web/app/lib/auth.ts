@@ -15,10 +15,16 @@ export interface ErrorResponse {
 
 export async function fetchMe(): Promise<User | null> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
     const res = await fetch('/api/auth/me', {
       method: 'GET',
       credentials: 'include',
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       return null;

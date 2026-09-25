@@ -7,6 +7,7 @@ import { useAuth } from '../context/auth-context';
 import { BankHeader } from '../components/BankHeader';
 import { BankFooter } from '../components/BankFooter';
 import { CaptchaBox } from '../components/CaptchaBox';
+import { RetroDialog } from '../components/RetroDialog';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function SignupPage() {
   }>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
@@ -120,10 +122,7 @@ export default function SignupPage() {
       });
 
       if (result.success) {
-        alert(
-          'Online Registration Successful! Your Internet Banking User ID has been created and activated. Redirecting to Secure Dashboard...'
-        );
-        router.push('/dashboard');
+        setShowSuccessDialog(true);
       } else {
         setGeneralError(result.error || 'Registration failed. Please contact your home branch.');
       }
@@ -431,6 +430,16 @@ export default function SignupPage() {
       </main>
 
       <BankFooter />
+
+      {/* Success Dialog */}
+      <RetroDialog
+        isOpen={showSuccessDialog}
+        title="Online Registration Successful"
+        message="Online Registration Successful!\nYour Internet Banking User ID has been created and activated in Core Banking.\nClick below to proceed to your secure dashboard."
+        confirmText="Proceed to Dashboard »"
+        onConfirm={() => router.push('/dashboard')}
+        onClose={() => router.push('/dashboard')}
+      />
     </div>
   );
 }

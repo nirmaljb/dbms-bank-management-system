@@ -8,6 +8,7 @@ import { BankHeader } from '../components/BankHeader';
 import { BankFooter } from '../components/BankFooter';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { CaptchaBox } from '../components/CaptchaBox';
+import { RetroDialog } from '../components/RetroDialog';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,6 +19,15 @@ export default function LoginPage() {
   const [captchaInput, setCaptchaInput] = useState('');
   const [currentCaptcha, setCurrentCaptcha] = useState('');
   const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false);
+
+  // Dialog state
+  const [dialogNotice, setDialogNotice] = useState<string | null>(null);
+  const [dialogTitle, setDialogTitle] = useState<string>('State Bank Notice');
+
+  const showNotice = (title: string, message: string) => {
+    setDialogTitle(title);
+    setDialogNotice(message);
+  };
 
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
@@ -101,19 +111,6 @@ export default function LoginPage() {
     setGeneralError(null);
   };
 
-  if (authLoading) {
-    return (
-      <div className="bank-page-container">
-        <BankHeader />
-        <div className="p-12 text-center text-slate-600 bg-white">
-          <div className="font-bold text-sm text-[#003366]">Connecting to CBS Authentication Host...</div>
-          <div className="text-xs text-slate-500 mt-2">Verifying secure SSL tunnel...</div>
-        </div>
-        <BankFooter />
-      </div>
-    );
-  }
-
   return (
     <div className="bank-page-container">
       <BankHeader />
@@ -167,16 +164,18 @@ export default function LoginPage() {
                 </ol>
 
                 <div className="mt-2 pt-2 border-t border-slate-200">
-                  <a
-                    href="#lock-access"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert('To lock your Internet Banking access immediately in case of emergency, send an SMS "LOCK <User ID>" to 567676 or call 1800 11 2211.');
-                    }}
-                    className="text-[#990000] hover:underline font-bold text-[10.5px] block"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      showNotice(
+                        'Emergency Lock Instructions',
+                        'To lock your Internet Banking access immediately in case of emergency:\n• Send SMS "LOCK <User ID>" to 567676 from registered mobile.\n• Or call National Cyber Crime Portal at 1930.\n• Or contact Toll Free: 1800 11 2211.'
+                      )
+                    }
+                    className="text-[#990000] hover:underline font-bold text-[10.5px] block bg-transparent border-0 cursor-pointer p-0 text-left"
                   >
                     &raquo; Emergency: Lock / Deactivate NetBanking Access Online
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>
@@ -389,38 +388,44 @@ export default function LoginPage() {
                     >
                       &raquo; New User? Register Here / Activate
                     </Link>
-                    <a
-                      href="#forgot-password"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        alert('To reset your Login Password: Go to Home Branch with Passbook and ID proof, or reset via registered ATM Card and Mobile OTP.');
-                      }}
-                      className="text-[#800000] hover:underline block mt-1"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        showNotice(
+                          'Forgot Password / Username',
+                          'To reset your Login Password or retrieve User ID:\n• Use your active ATM / Debit Card and validate through Mobile OTP.\n• Or visit your Home Branch with Passbook and KYC documents.'
+                        )
+                      }
+                      className="text-[#800000] hover:underline block mt-1 bg-transparent border-0 cursor-pointer p-0 text-left text-[11px]"
                     >
                       &raquo; Forgot Login Password / User ID?
-                    </a>
+                    </button>
                   </div>
                   <div>
-                    <a
-                      href="#reset-profile"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        alert('Forgot Profile Password: You can reset using your secret question and answer, or through branch approval.');
-                      }}
-                      className="text-slate-700 hover:underline block"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        showNotice(
+                          'Reset Profile Password',
+                          'To reset Profile Password:\n• Answer your secret hint question set during registration.\n• Or generate an approval request for Home Branch verification.'
+                        )
+                      }
+                      className="text-slate-700 hover:underline block bg-transparent border-0 cursor-pointer p-0 text-left text-[11px]"
                     >
                       &raquo; Forgot Profile Password?
-                    </a>
-                    <a
-                      href="#lock-user"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        alert('Lock User Access: You can lock access online by entering Username, Account Number and Date of Birth.');
-                      }}
-                      className="text-[#990000] hover:underline block mt-1"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        showNotice(
+                          'Lock User Access Online',
+                          'Lock User Access:\nEnter your User ID, Account Number and Date of Birth to place an emergency lock on Internet Banking access.'
+                        )
+                      }
+                      className="text-[#990000] hover:underline block mt-1 bg-transparent border-0 cursor-pointer p-0 text-left text-[11px]"
                     >
                       &raquo; Lock User Access Online
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -430,6 +435,14 @@ export default function LoginPage() {
       </main>
 
       <BankFooter />
+
+      {/* Info Dialog */}
+      <RetroDialog
+        isOpen={!!dialogNotice}
+        title={dialogTitle}
+        message={dialogNotice || ''}
+        onClose={() => setDialogNotice(null)}
+      />
     </div>
   );
 }
