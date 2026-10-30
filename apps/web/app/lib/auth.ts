@@ -3,6 +3,8 @@ export interface User {
   name: string;
   email: string;
   role: 'customer' | 'admin';
+  accountNumber?: string;
+  cifNumber?: string;
 }
 
 export interface AuthResponse {
@@ -15,16 +17,10 @@ export interface ErrorResponse {
 
 export async function fetchMe(): Promise<User | null> {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
     const res = await fetch('/api/auth/me', {
       method: 'GET',
       credentials: 'include',
-      signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     if (!res.ok) {
       return null;
@@ -41,6 +37,8 @@ export async function signupUser(input: {
   name: string;
   email: string;
   password: string;
+  accountNumber?: string;
+  cifNumber?: string;
 }): Promise<{ user?: User; error?: string }> {
   try {
     const res = await fetch('/api/auth/signup', {
@@ -56,7 +54,7 @@ export async function signupUser(input: {
     }
 
     return { user: data.user };
-  } catch (err) {
+  } catch {
     return { error: 'Network error. Please try again later.' };
   }
 }
@@ -79,25 +77,19 @@ export async function loginUser(input: {
     }
 
     return { user: data.user };
-  } catch (err) {
+  } catch {
     return { error: 'Network error. Please try again later.' };
   }
 }
 
-export async function logoutUser(): Promise<{ success: boolean; error?: string }> {
+export async function logoutUser(): Promise<{ success: boolean }> {
   try {
     const res = await fetch('/api/auth/logout', {
       method: 'POST',
       credentials: 'include',
     });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return { success: false, error: data.error || 'Logout failed' };
-    }
-
-    return { success: true };
+    return { success: res.ok };
   } catch {
-    return { success: false, error: 'Network error' };
+    return { success: false };
   }
 }

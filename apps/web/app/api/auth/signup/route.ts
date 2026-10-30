@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, password } = validation.data;
+    const { name, email, password, accountNumber, cifNumber } = validation.data;
     const normalizedEmail = email.toLowerCase().trim();
 
     const existingUser = await userStore.findByEmail(normalizedEmail);
@@ -38,6 +38,8 @@ export async function POST(request: Request) {
       email: normalizedEmail,
       passwordHash,
       role: 'customer',
+      accountNumber,
+      cifNumber,
     });
 
     const token = signToken({
@@ -45,6 +47,8 @@ export async function POST(request: Request) {
       email: user.email,
       role: user.role,
       name: user.name,
+      accountNumber: user.accountNumber,
+      cifNumber: user.cifNumber,
     });
 
     const cookieStore = await cookies();
@@ -57,6 +61,8 @@ export async function POST(request: Request) {
           name: user.name,
           email: user.email,
           role: user.role,
+          accountNumber: user.accountNumber,
+          cifNumber: user.cifNumber,
         },
       },
       { status: 201 }

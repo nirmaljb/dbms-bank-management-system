@@ -21,12 +21,28 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async create(data: CreateUserData): Promise<UserRecord> {
     const now = new Date();
+    const existingAccounts = new Set<string>();
+    for (const u of this.users.values()) {
+      if (u.accountNumber) existingAccounts.add(u.accountNumber);
+    }
+    existingAccounts.add('30892019482');
+
+    let acc = data.accountNumber;
+    if (!acc || existingAccounts.has(acc)) {
+      do {
+        const rand9 = Math.floor(100000000 + Math.random() * 900000000).toString();
+        acc = `30${rand9}`;
+      } while (existingAccounts.has(acc));
+    }
+
     const user: UserRecord = {
       id: crypto.randomUUID(),
       name: data.name,
       email: data.email.toLowerCase().trim(),
       passwordHash: data.passwordHash,
       role: data.role || 'customer',
+      accountNumber: acc,
+      cifNumber: data.cifNumber || `89${Math.floor(100000000 + Math.random() * 900000000)}`,
       createdAt: now,
       updatedAt: now,
     };

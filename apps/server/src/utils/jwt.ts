@@ -5,6 +5,8 @@ export interface AuthTokenPayload {
   email: string;
   role: 'customer' | 'admin';
   name: string;
+  accountNumber?: string;
+  cifNumber?: string;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'bank-management-default-secret-key-change-me';
