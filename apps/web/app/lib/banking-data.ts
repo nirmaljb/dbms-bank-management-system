@@ -99,10 +99,10 @@ const DEFAULT_TRANSACTIONS: BankTransaction[] = [
   },
   {
     id: 'TXN-02',
-    txnDate: '23-Sep-2026',
-    valueDate: '23-Sep-2026',
-    description: 'NEFT CR-HDFC0000128-TECHCORP LTD-SALARY SEP 2026',
-    refNo: 'NEFT928103948',
+    txnDate: '22-Sep-2026',
+    valueDate: '22-Sep-2026',
+    description: 'NEFT CR-SALARY-TCS LTD MUMBAI-SBIN002910',
+    refNo: 'NEFT81920192',
     type: 'CREDIT',
     amount: 85000.0,
     balance: 148790.75,
@@ -110,10 +110,10 @@ const DEFAULT_TRANSACTIONS: BankTransaction[] = [
   },
   {
     id: 'TXN-03',
-    txnDate: '20-Sep-2026',
-    valueDate: '20-Sep-2026',
-    description: 'ATM WDL-SBI CASH POINT CONNAUGHT PLACE',
-    refNo: 'ATM0092182',
+    txnDate: '18-Sep-2026',
+    valueDate: '18-Sep-2026',
+    description: 'ATM WDL-CONNAUGHT PLACE ATM 02-NEW DELHI',
+    refNo: 'ATMW918201',
     type: 'DEBIT',
     amount: 10000.0,
     balance: 63790.75,
@@ -121,10 +121,10 @@ const DEFAULT_TRANSACTIONS: BankTransaction[] = [
   },
   {
     id: 'TXN-04',
-    txnDate: '15-Sep-2026',
-    valueDate: '15-Sep-2026',
-    description: 'IMPS/P2A/6255192810/RAJESH SHARMA/RENT SEP',
-    refNo: 'IMPS625519281',
+    txnDate: '12-Sep-2026',
+    valueDate: '12-Sep-2026',
+    description: 'IMPS P2A-91827491028-RENT MR SHARMA',
+    refNo: 'IMPS918203',
     type: 'DEBIT',
     amount: 28000.0,
     balance: 73790.75,
@@ -132,10 +132,10 @@ const DEFAULT_TRANSACTIONS: BankTransaction[] = [
   },
   {
     id: 'TXN-05',
-    txnDate: '10-Sep-2026',
-    valueDate: '10-Sep-2026',
-    description: 'ACH DR-TATA POWER DELHI BILL PAYMENT',
-    refNo: 'ACH0039218',
+    txnDate: '05-Sep-2026',
+    valueDate: '05-Sep-2026',
+    description: 'BILLDESK-BSES ELECTRICITY BILL-NEW DELHI',
+    refNo: 'BD92810291',
     type: 'DEBIT',
     amount: 3420.0,
     balance: 101790.75,
@@ -235,7 +235,10 @@ const DEFAULT_CHEQUE_REQUESTS: ChequeRequest[] = [
 ];
 
 // Helper to get or set user-specific data from localStorage
-export function getBankingData(userEmail: string) {
+export function getBankingData(
+  userEmail: string,
+  user?: { name?: string; accountNumber?: string; cifNumber?: string } | null
+) {
   if (typeof window === 'undefined') {
     return {
       accounts: DEFAULT_ACCOUNTS,
@@ -246,7 +249,8 @@ export function getBankingData(userEmail: string) {
     };
   }
 
-  const key = `bank_store_${userEmail.toLowerCase().trim()}`;
+  const normalized = userEmail.toLowerCase().trim();
+  const key = `bank_store_${normalized}`;
   const stored = localStorage.getItem(key);
 
   if (stored) {
@@ -257,13 +261,67 @@ export function getBankingData(userEmail: string) {
     }
   }
 
+  // Pre-configured demo accounts
+  if (normalized === 'demo@example.com' || normalized === 'admin@example.com') {
+    const initial = {
+      accounts: DEFAULT_ACCOUNTS,
+      transactions: DEFAULT_TRANSACTIONS,
+      beneficiaries: DEFAULT_BENEFICIARIES,
+      fds: DEFAULT_FDS,
+      chequeRequests: DEFAULT_CHEQUE_REQUESTS,
+    };
+    localStorage.setItem(key, JSON.stringify(initial));
+    return initial;
+  }
+
+  // For every newly registered user, allocate their unique random account & CIF number
+  const uniqueAccNo = user?.accountNumber || `30${Math.floor(100000000 + Math.random() * 900000000)}`;
+  const uniqueCifNo = user?.cifNumber || `89${Math.floor(100000000 + Math.random() * 900000000)}`;
+  const holderName = user?.name ? user.name.toUpperCase() : 'NEW CUSTOMER';
+  const todayFormatted = new Date()
+    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    .replace(/ /g, '-');
+
+  const initialBalance = 50000.0;
+
+  const userAccounts: BankAccount[] = [
+    {
+      accountNumber: uniqueAccNo,
+      cifNumber: uniqueCifNo,
+      accountType: 'SAVINGS BANK ACCOUNT',
+      branchName: 'CONNAUGHT PLACE, NEW DELHI [00691]',
+      ifscCode: 'SBIN0000691',
+      balance: initialBalance,
+      unclearedBalance: 0.0,
+      currency: 'INR',
+      status: 'ACTIVE',
+      nomineeRegistered: true,
+      openDate: todayFormatted,
+    },
+  ];
+
+  const userTxns: BankTransaction[] = [
+    {
+      id: `TXN-${Date.now().toString().slice(-6)}`,
+      txnDate: todayFormatted,
+      valueDate: todayFormatted,
+      description: `A/C OPENING INITIAL DEPOSIT / ONLINE ONBOARDING - ${holderName}`,
+      refNo: `CBS${Math.floor(10000000 + Math.random() * 90000000)}`,
+      type: 'CREDIT',
+      amount: initialBalance,
+      balance: initialBalance,
+      channel: 'BRANCH',
+    },
+  ];
+
   const initial = {
-    accounts: DEFAULT_ACCOUNTS,
-    transactions: DEFAULT_TRANSACTIONS,
+    accounts: userAccounts,
+    transactions: userTxns,
     beneficiaries: DEFAULT_BENEFICIARIES,
-    fds: DEFAULT_FDS,
-    chequeRequests: DEFAULT_CHEQUE_REQUESTS,
+    fds: [],
+    chequeRequests: [],
   };
+
   localStorage.setItem(key, JSON.stringify(initial));
   return initial;
 }

@@ -39,6 +39,8 @@ export async function POST(request: Request) {
       email: user.email,
       role: user.role,
       name: user.name,
+      accountNumber: user.accountNumber,
+      cifNumber: user.cifNumber,
     });
 
     const cookieStore = await cookies();
@@ -51,6 +53,8 @@ export async function POST(request: Request) {
           name: user.name,
           email: user.email,
           role: user.role,
+          accountNumber: user.accountNumber,
+          cifNumber: user.cifNumber,
         },
       },
       { status: 200 }

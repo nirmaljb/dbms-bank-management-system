@@ -111,7 +111,7 @@ export default function DashboardPage() {
   // Load banking data from storage
   useEffect(() => {
     if (user?.email) {
-      const data = getBankingData(user.email);
+      const data = getBankingData(user.email, user);
       setAccounts(data.accounts);
       setTransactions(data.transactions);
       setBeneficiaries(data.beneficiaries);
@@ -139,8 +139,8 @@ export default function DashboardPage() {
     return (
       accounts.find((a) => a.accountNumber === selectedAccountNo) ||
       accounts[0] || {
-        accountNumber: '30892019482',
-        cifNumber: '89201948210',
+        accountNumber: user?.accountNumber || '30892019482',
+        cifNumber: user?.cifNumber || '89201948210',
         accountType: 'SAVINGS BANK ACCOUNT' as const,
         branchName: 'CONNAUGHT PLACE, NEW DELHI [00691]',
         ifscCode: 'SBIN0000691',

@@ -4,6 +4,8 @@ export interface UserRecord {
   email: string;
   passwordHash: string;
   role: 'customer' | 'admin';
+  accountNumber?: string;
+  cifNumber?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -13,6 +15,8 @@ export interface CreateUserData {
   email: string;
   passwordHash: string;
   role?: 'customer' | 'admin';
+  accountNumber?: string;
+  cifNumber?: string;
 }
 
 export interface IUserRepository {

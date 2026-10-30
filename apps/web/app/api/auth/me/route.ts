@@ -28,6 +28,8 @@ export async function GET() {
           name: user.name,
           email: user.email,
           role: user.role,
+          accountNumber: user.accountNumber,
+          cifNumber: user.cifNumber,
         },
       },
       { status: 200 }

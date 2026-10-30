@@ -7,7 +7,13 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (input: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
-  signup: (input: { name: string; email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  signup: (input: {
+    name: string;
+    email: string;
+    password: string;
+    accountNumber?: string;
+    cifNumber?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -46,7 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: res.error || 'Login failed' };
   };
 
-  const signup = async (input: { name: string; email: string; password: string }) => {
+  const signup = async (input: {
+    name: string;
+    email: string;
+    password: string;
+    accountNumber?: string;
+    cifNumber?: string;
+  }) => {
     const res = await signupUser(input);
     if (res.user) {
       setUser(res.user);
