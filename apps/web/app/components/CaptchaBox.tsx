@@ -11,6 +11,11 @@ interface CaptchaBoxProps {
 export function CaptchaBox({ onCaptchaGenerated }: CaptchaBoxProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [, setCaptchaCode] = useState('');
+  const onCaptchaGeneratedRef = useRef(onCaptchaGenerated);
+
+  useEffect(() => {
+    onCaptchaGeneratedRef.current = onCaptchaGenerated;
+  }, [onCaptchaGenerated]);
 
   const generateRandomCode = (): string => {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
@@ -80,11 +85,11 @@ export function CaptchaBox({ onCaptchaGenerated }: CaptchaBoxProps) {
   const refreshCaptcha = useCallback(() => {
     const newCode = generateRandomCode();
     setCaptchaCode(newCode);
-    if (onCaptchaGenerated) {
-      onCaptchaGenerated(newCode);
+    if (onCaptchaGeneratedRef.current) {
+      onCaptchaGeneratedRef.current(newCode);
     }
     drawCaptcha(newCode);
-  }, [drawCaptcha, onCaptchaGenerated]);
+  }, [drawCaptcha]);
 
   useEffect(() => {
     refreshCaptcha();
