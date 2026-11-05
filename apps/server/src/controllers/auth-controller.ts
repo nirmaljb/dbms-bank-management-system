@@ -67,7 +67,17 @@ export class AuthController {
     }
   };
 
-  login = async (req: AuthenticatedRequest, res: Response) => {
+  /** Customer login. Admins are turned away to the admin portal. */
+  login = (req: AuthenticatedRequest, res: Response) => this.loginAs('customer', req, res);
+
+  /** Admin login. Customers are turned away. */
+  adminLogin = (req: AuthenticatedRequest, res: Response) => this.loginAs('admin', req, res);
+
+  private loginAs = async (
+    role: 'customer' | 'admin',
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
     try {
       const validation = validateLoginInput(req.body);
       if (!validation.success) {
@@ -87,6 +97,15 @@ export class AuthController {
       const isPasswordValid = await comparePassword(password, user.passwordHash);
       if (!isPasswordValid) {
         return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      if (user.role !== role) {
+        return res.status(403).json({
+          error:
+            role === 'customer'
+              ? 'Administrators must sign in at the admin portal'
+              : 'This portal is for bank administrators only',
+        });
       }
 
       const token = signToken({

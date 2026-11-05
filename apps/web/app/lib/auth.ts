@@ -5,14 +5,6 @@ export interface User {
   role: 'customer' | 'admin';
 }
 
-export interface AuthResponse {
-  user: User;
-}
-
-export interface ErrorResponse {
-  error: string;
-}
-
 export async function fetchMe(): Promise<User | null> {
   try {
     const controller = new AbortController();
@@ -61,12 +53,15 @@ export async function signupUser(input: {
   }
 }
 
-export async function loginUser(input: {
-  email: string;
-  password: string;
-}): Promise<{ user?: User; error?: string }> {
+export async function loginUser(
+  input: {
+    email: string;
+    password: string;
+  },
+  endpoint: '/api/auth/login' | '/api/auth/admin/login' = '/api/auth/login'
+): Promise<{ user?: User; error?: string }> {
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -82,6 +77,10 @@ export async function loginUser(input: {
   } catch (err) {
     return { error: 'Network error. Please try again later.' };
   }
+}
+
+export function adminLoginUser(input: { email: string; password: string }) {
+  return loginUser(input, '/api/auth/admin/login');
 }
 
 export async function logoutUser(): Promise<{ success: boolean; error?: string }> {

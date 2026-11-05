@@ -19,3 +19,15 @@ export function authenticate(req: AuthenticatedRequest, res: Response, next: Nex
     return res.status(401).json({ error: 'Unauthorized' });
   }
 }
+
+export function requireRole(role: AuthTokenPayload['role']) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    if (req.user.role !== role) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+  };
+}

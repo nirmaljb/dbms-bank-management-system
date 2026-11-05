@@ -1,159 +1,62 @@
-# Turborepo starter
+# Bharat National Bank — DBMS Lab Bank Management System
 
-This Turborepo starter is maintained by the Turborepo core team.
+A fictional retail bank. Customers open a savings account, deposit, withdraw, take a loan and track their credit score. Admins approve large withdrawals, reverse transactions, freeze accounts, sanction loans, run the monthly loan cycle and send notices.
 
-## Using this example
+All banking rules live **in PostgreSQL** as stored procedures, triggers, functions and views ([ADR 0002](docs/adr/0002-banking-logic-in-postgres.md)). Express only authenticates the caller and `CALL`s them. Full rules: [docs/BANKING-SPEC.md](docs/BANKING-SPEC.md).
 
-Run the following command:
+## Layout
 
-```sh
-npx create-turbo@latest
+| Path | What |
+|---|---|
+| `apps/server` | Express + TypeScript API on port 5001 (`pg` driver) |
+| `apps/server/db/sql` | The database: `001_types` → `006_views`, applied in order |
+| `apps/web` | Next.js app on port 3000; `/api/*` is rewritten to the Express server |
+
+## Setup
+
+1. Create `apps/server/.env` (see `apps/server/.env.example`):
+   ```
+   DATABASE_URL=postgresql://...   # NeonDB or any Postgres 14+
+   JWT_SECRET=some-long-random-string
+   ```
+2. Install and build the database:
+   ```sh
+   npm install
+   npm run db:setup
+   ```
+   This applies every SQL file and seeds two test users (password `password123` for both):
+   - admin: `admin@example.com` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`)
+   - customer: `demo@example.com` (skip with `npm run db:setup --workspace=apps/server -- --no-demo`)
+
+   Setup is idempotent. To wipe and rebuild (for example, a database created by the old Drizzle schema):
+   ```sh
+   npm run db:setup --workspace=apps/server -- --reset
+   ```
+3. Run both apps:
+   ```sh
+   npm run dev
+   ```
+   Customers: http://localhost:3000/login · Admins: http://localhost:3000/admin/login
+
+## Database objects
+
+- **Tables**: `users`, `accounts`, `transactions`, `loans`, `loan_dues`, `notices`, `notice_reads`, `audit_log`
+- **Procedures**: `sp_deposit`, `sp_withdraw`, `sp_approve_withdrawal`, `sp_reject_withdrawal`, `sp_reverse_transaction`, `sp_set_account_status`, `sp_request_loan`, `sp_sanction_loan`, `sp_reject_loan`, `sp_pay_interest`, `sp_repay_principal`, `sp_run_monthly_cycle`
+- **Functions**: `fn_credit_score`, `fn_credit_score_breakdown`, `fn_suggested_rate`, plus helpers
+- **Triggers**: account auto-creation, frozen-account block, append-only ledger, balance posting, `updated_at`, row audit
+- **Views**: `v_account_statement`, `v_admin_transactions`, `v_loan_summary`, `v_customer_overview`
+
+Try it in `psql`:
+
+```sql
+CALL sp_deposit((SELECT id FROM users WHERE email = 'demo@example.com'), 2500.00, NULL);
+SELECT * FROM v_account_statement ORDER BY posted_at DESC LIMIT 5;
+SELECT * FROM fn_credit_score_breakdown((SELECT id FROM users WHERE email = 'demo@example.com'));
+SELECT table_name, action, changed_at FROM audit_log ORDER BY id DESC LIMIT 10;
 ```
 
-## What's inside?
-
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+## Tests
 
 ```sh
-cd my-turborepo
-turbo build
+npm test
 ```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)

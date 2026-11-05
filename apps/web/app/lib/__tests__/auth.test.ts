@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchMe, signupUser, loginUser, logoutUser } from '../auth';
+import { fetchMe, signupUser, loginUser, adminLoginUser, logoutUser } from '../auth';
 
 describe('Frontend Auth API Utilities', () => {
   const originalFetch = global.fetch;
@@ -28,10 +28,10 @@ describe('Frontend Auth API Utilities', () => {
 
       const user = await fetchMe();
       expect(user).toEqual(mockUser);
-      expect(global.fetch).toHaveBeenCalledWith('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include',
-      });
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/auth/me',
+        expect.objectContaining({ method: 'GET', credentials: 'include' })
+      );
     });
 
     it('returns null when unauthenticated (401)', async () => {
@@ -134,6 +134,33 @@ describe('Frontend Auth API Utilities', () => {
 
       expect(result.user).toBeUndefined();
       expect(result.error).toBe('Invalid email or password');
+    });
+  });
+
+  describe('adminLoginUser', () => {
+    it('posts to the admin login endpoint', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ user: { id: 'a', name: 'Admin', email: 'admin@example.com', role: 'admin' } }),
+      } as Response);
+
+      const result = await adminLoginUser({ email: 'admin@example.com', password: 'password123' });
+
+      expect(result.user?.role).toBe('admin');
+      expect(global.fetch).toHaveBeenCalledWith('/api/auth/admin/login', expect.objectContaining({ method: 'POST' }));
+    });
+
+    it('surfaces the server error when a customer uses the admin portal', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'This portal is for bank administrators only' }),
+      } as Response);
+
+      const result = await adminLoginUser({ email: 'jane@example.com', password: 'password123' });
+
+      expect(result.error).toBe('This portal is for bank administrators only');
     });
   });
 

@@ -3,8 +3,8 @@ import "./globals.css";
 import { AuthProvider } from "./context/auth-context";
 
 export const metadata: Metadata = {
-  title: "State Bank of India - Retail Internet Banking System",
-  description: "Secure Core Banking & NetBanking Portal. Online SBI / Bharat National Bank account services, fund transfers, e-deposits, and statements.",
+  title: "Bharat National Bank - NetBanking",
+  description: "Fictional retail bank for a DBMS lab: savings accounts, deposits, withdrawals, loans and credit scores, with all banking logic in PostgreSQL.",
 };
 
 export default function RootLayout({

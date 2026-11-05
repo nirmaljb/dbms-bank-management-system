@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { createAuthRoutes } from './routes/auth-routes.js';
-import { DrizzleUserRepository } from './db/drizzle-user-repository.js';
-import { InMemoryUserRepository } from './services/in-memory-user-repository.js';
+import { createCustomerRoutes } from './routes/customer-routes.js';
+import { createAdminRoutes } from './routes/admin-routes.js';
+import { PgUserRepository } from './db/pg-user-repository.js';
 import type { IUserRepository } from './db/user-repository.interface.js';
 
 export interface AppOptions {
@@ -13,11 +14,7 @@ export interface AppOptions {
 export function createApp(options: AppOptions = {}): express.Express {
   const app: express.Express = express();
 
-  const userRepository =
-    options.userRepository ||
-    (process.env.DATABASE_URL
-      ? new DrizzleUserRepository()
-      : new InMemoryUserRepository());
+  const userRepository = options.userRepository || new PgUserRepository();
 
   app.use(
     cors({
@@ -30,6 +27,8 @@ export function createApp(options: AppOptions = {}): express.Express {
 
   // Mount API endpoints
   app.use('/api/auth', createAuthRoutes(userRepository));
+  app.use('/api/customer', createCustomerRoutes());
+  app.use('/api/admin', createAdminRoutes());
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });

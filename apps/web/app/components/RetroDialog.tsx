@@ -14,7 +14,7 @@ interface RetroDialogProps {
 
 export function RetroDialog({
   isOpen,
-  title = 'State Bank Internet Banking Notice',
+  title = 'Bharat National Bank Notice',
   message,
   onClose,
   confirmText = 'OK',

@@ -7,11 +7,11 @@ A lightweight authentication system for the Bank Management platform consisting 
 
 ## 1. Architecture
 
-- **Backend**: Express + TypeScript in `apps/server` (port `5000`).
+- **Backend**: Express + TypeScript in `apps/server` (port `5001`).
 - **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS in `apps/web` (port `3000`).
-- **Database**: NeonDB PostgreSQL accessed via Drizzle ORM (`@neondatabase/serverless`).
+- **Database**: NeonDB PostgreSQL accessed with `pg` (node-postgres). See [ADR 0002](./adr/0002-banking-logic-in-postgres.md).
 - **Session Transport**: Signed JWT transmitted via HTTP-only, `SameSite=Lax` cookies.
-- **Proxy**: Next.js rewrite rule (`/api/:path*` -> `http://localhost:5000/api/:path*`) to avoid CORS/cookie domain mismatch in development.
+- **Proxy**: Next.js rewrite rule (`/api/:path*` -> `http://localhost:5001/api/:path*`) to avoid CORS/cookie domain mismatch in development.
 
 ---
 
@@ -113,6 +113,6 @@ interface User {
 
 ## 5. Database Schema & Migration
 
-- **Schema definition**: `apps/server/src/db/schema.ts` via `drizzle-orm/pg-core`.
-- **Sync mechanism**: `drizzle-kit push` for instant synchronisation against NeonDB.
-- **Config**: `apps/server/drizzle.config.ts` loading `DATABASE_URL` from `.env`.
+- **Schema definition**: plain SQL files in `apps/server/db/sql/`, applied in filename order.
+- **Sync mechanism**: `npm run db:setup --workspace=apps/server` (idempotent; `-- --reset` drops and rebuilds).
+- **Config**: `DATABASE_URL` from `apps/server/.env`. Superseded in detail by [BANKING-SPEC.md](./BANKING-SPEC.md).

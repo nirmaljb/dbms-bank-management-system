@@ -1,25 +1,5 @@
 @import "tailwindcss";
 
-:root {
-  --bank-blue-dark: #002b49;
-  --bank-blue: #004c8f;
-  --bank-blue-medium: #006699;
-  --bank-blue-light: #dbe8f5;
-  --bank-blue-subtle: #f0f4f9;
-  --bank-header-gradient: linear-gradient(180deg, #004b87 0%, #002b49 100%);
-  --bank-nav-gradient: linear-gradient(180deg, #1967a8 0%, #004b87 100%);
-  --bank-btn-gradient: linear-gradient(180deg, #0066b3 0%, #004480 100%);
-  --bank-yellow: #f8991d;
-  --bank-yellow-light: #fff8e6;
-  --bank-border: #99b4d1;
-  --bank-border-dark: #6688aa;
-  --bank-border-table: #b0c4de;
-  --bank-red: #a30000;
-  --bank-red-dark: #800000;
-  --bank-green: #006600;
-  --bank-bg-gray: #e8ecf1;
-}
-
 body {
   color: #222222;
   background-color: #eef2f6;
@@ -47,23 +27,6 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.bank-top-utility {
-  background-color: #00223d;
-  color: #ffffff;
-  font-size: 11px;
-  padding: 3px 10px;
-  border-bottom: 1px solid #001729;
-}
-
-.bank-top-utility a {
-  color: #cce0ff;
-  text-decoration: none;
-}
-.bank-top-utility a:hover {
-  text-decoration: underline;
-  color: #ffffff;
 }
 
 .bank-header-main {
@@ -106,16 +69,6 @@ body {
   border-bottom: 1px solid #ffffff;
 }
 
-.bank-ticker {
-  background-color: #fff9e6;
-  border-bottom: 1px solid #eedd82;
-  border-top: 1px solid #eedd82;
-  color: #8b0000;
-  font-size: 11.5px;
-  font-weight: bold;
-  padding: 4px 10px;
-}
-
 .bank-panel-box {
   background-color: #ffffff;
   border: 1px solid #99b4d1;
@@ -141,44 +94,6 @@ body {
   font-size: 12px;
   font-weight: bold;
   border-bottom: 1px solid #99b4d1;
-}
-
-.bank-sidebar-menu {
-  background-color: #f4f7fa;
-  border: 1px solid #99b4d1;
-}
-
-.bank-sidebar-cat-title {
-  background: linear-gradient(180deg, #004c8f 0%, #003366 100%);
-  color: #ffffff;
-  font-weight: bold;
-  font-size: 11.5px;
-  padding: 5px 8px;
-  border-top: 1px solid #3377aa;
-  border-bottom: 1px solid #001f3f;
-}
-
-.bank-sidebar-link {
-  display: block;
-  padding: 5px 10px 5px 16px;
-  color: #003366;
-  font-size: 11px;
-  border-bottom: 1px dotted #b0c4de;
-  text-decoration: none;
-  background-color: #ffffff;
-}
-
-.bank-sidebar-link:hover {
-  background-color: #e6effa;
-  color: #990000;
-  text-decoration: underline;
-}
-
-.bank-sidebar-link.active {
-  background-color: #dce7f5;
-  color: #8b0000;
-  font-weight: bold;
-  border-left: 4px solid #f8991d;
 }
 
 /* Classic Table */
@@ -291,40 +206,4 @@ body {
   padding: 8px 10px;
   color: #4a3c00;
   font-size: 11px;
-}
-
-/* Classic virtual keyboard button */
-.bank-vk-btn {
-  font-family: monospace, Arial;
-  font-size: 12px;
-  font-weight: bold;
-  background: #eef2f5;
-  border: 1px solid #7f9db9;
-  border-radius: 2px;
-  padding: 4px 7px;
-  cursor: pointer;
-  user-select: none;
-}
-.bank-vk-btn:hover {
-  background: #dbe8f5;
-  border-color: #004c8f;
-}
-.bank-vk-btn:active {
-  background: #b8cde4;
-}
-
-/* Marquee simulation */
-@keyframes bank-marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-
-.bank-marquee-content {
-  display: inline-block;
-  white-space: nowrap;
-  animation: bank-marquee 32s linear infinite;
-}
-
-.bank-marquee-content:hover {
-  animation-play-state: paused;
 }

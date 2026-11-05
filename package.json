@@ -7,12 +7,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web",
+    "dev": "turbo run dev --filter=web --filter=server",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "db:setup": "npm run db:setup --workspace=apps/server"
   },
   "devDependencies": {
     "prettier": "3.9.6",

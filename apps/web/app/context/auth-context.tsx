@@ -1,15 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, fetchMe, loginUser, signupUser, logoutUser } from '../lib/auth';
+import { User, fetchMe, loginUser, adminLoginUser, signupUser, logoutUser } from '../lib/auth';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (input: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  adminLogin: (input: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   signup: (input: { name: string; email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: res.error || 'Login failed' };
   };
 
+  const adminLogin = async (input: { email: string; password: string }) => {
+    const res = await adminLoginUser(input);
+    if (res.user) {
+      setUser(res.user);
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'Login failed' };
+  };
+
   const signup = async (input: { name: string; email: string; password: string }) => {
     const res = await signupUser(input);
     if (res.user) {
@@ -61,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, adminLogin, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

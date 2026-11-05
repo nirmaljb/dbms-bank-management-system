@@ -9,6 +9,7 @@ export function createAuthRoutes(userRepository: IUserRepository): Router {
 
   router.post('/signup', controller.signup);
   router.post('/login', controller.login);
+  router.post('/admin/login', controller.adminLogin);
   router.post('/logout', controller.logout);
   router.get('/me', authenticate, controller.me);
 

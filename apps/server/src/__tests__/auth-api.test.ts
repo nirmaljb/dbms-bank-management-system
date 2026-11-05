@@ -134,6 +134,92 @@ describe('Auth API Endpoints', () => {
     });
   });
 
+  describe('role-scoped login', () => {
+    beforeEach(async () => {
+      await userRepository.create({
+        name: 'Bank Admin',
+        email: 'admin@example.com',
+        passwordHash: await hashPassword('adminPassword123'),
+        role: 'admin',
+      });
+      await userRepository.create({
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        passwordHash: await hashPassword('securePassword123'),
+        role: 'customer',
+      });
+    });
+
+    it('rejects an admin on the customer login', async () => {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'admin@example.com', password: 'adminPassword123' });
+
+      expect(res.status).toBe(403);
+      expect(res.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('logs an admin in on the admin login', async () => {
+      const res = await request(app)
+        .post('/api/auth/admin/login')
+        .send({ email: 'admin@example.com', password: 'adminPassword123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('admin');
+    });
+
+    it('rejects a customer on the admin login', async () => {
+      const res = await request(app)
+        .post('/api/auth/admin/login')
+        .send({ email: 'jane@example.com', password: 'securePassword123' });
+
+      expect(res.status).toBe(403);
+      expect(res.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('returns the generic 401 for a wrong admin password', async () => {
+      const res = await request(app)
+        .post('/api/auth/admin/login')
+        .send({ email: 'admin@example.com', password: 'wrong' });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Invalid email or password');
+    });
+  });
+
+  describe('banking routes require the right role', () => {
+    const cookieFor = async (role: 'customer' | 'admin') => {
+      await userRepository.create({
+        name: 'Role User',
+        email: `${role}@example.com`,
+        passwordHash: await hashPassword('rolePassword123'),
+        role,
+      });
+      const path = role === 'admin' ? '/api/auth/admin/login' : '/api/auth/login';
+      const res = await request(app)
+        .post(path)
+        .send({ email: `${role}@example.com`, password: 'rolePassword123' });
+      return res.headers['set-cookie'] as unknown as string[];
+    };
+
+    it('returns 401 without a session', async () => {
+      expect((await request(app).get('/api/customer/overview')).status).toBe(401);
+      expect((await request(app).get('/api/admin/overview')).status).toBe(401);
+    });
+
+    it('returns 403 for a customer on admin routes', async () => {
+      const cookie = await cookieFor('customer');
+      const res = await request(app).get('/api/admin/overview').set('Cookie', cookie);
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 for an admin on customer routes', async () => {
+      const cookie = await cookieFor('admin');
+      const res = await request(app).post('/api/customer/deposit').set('Cookie', cookie).send({ amount: '10' });
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe('POST /api/auth/logout', () => {
     it('clears token cookie and returns 200', async () => {
       const res = await request(app).post('/api/auth/logout');

@@ -1,8 +1,0 @@
-{
-  "name": "Bank Management System",
-  "description": "State Bank of India & Bharat National Bank NetBanking Portal. Online banking account services, fund transfers, e-deposits, and statements.",
-  "permissions": [],
-  "capabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
