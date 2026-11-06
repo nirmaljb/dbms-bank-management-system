@@ -4,19 +4,45 @@
 
 export type ApiResult<T> = { data: T; error?: undefined } | { data?: undefined; error: string };
 
+/**
+ * Asks the user for their transaction PIN; resolves to null if they cancel.
+ * `error` is the reason the last PIN was refused. Registered by PinPromptProvider.
+ */
+export type PinPrompt = (error?: string) => Promise<string | null>;
+
+let pinPrompt: PinPrompt | null = null;
+
+export function setPinPrompt(prompt: PinPrompt | null) {
+  pinPrompt = prompt;
+}
+
+// Every action route answers 428 PIN_REQUIRED until the request carries the
+// PIN, so the server decides which requests need one. A wrong PIN asks again;
+// a locked PIN or a cancel ends the request.
 async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiResult<T>> {
+  let pin: string | null = null;
   try {
-    const res = await fetch(`/api${path}`, {
-      method,
-      credentials: 'include',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return { error: json.error || `Request failed (${res.status})` };
+    for (;;) {
+      const headers: Record<string, string> = {};
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
+      if (pin) headers['X-Transaction-Pin'] = pin;
+      const res = await fetch(`/api${path}`, {
+        method,
+        credentials: 'include',
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if ((json.code === 'PIN_REQUIRED' || json.code === 'PIN_INVALID') && pinPrompt) {
+        pin = await pinPrompt(json.code === 'PIN_INVALID' ? json.error : undefined);
+        if (pin === null) return { error: 'Cancelled. Nothing was changed because the PIN was not entered.' };
+        continue;
+      }
+      if (!res.ok) {
+        return { error: json.error || `Request failed (${res.status})` };
+      }
+      return { data: json as T };
     }
-    return { data: json as T };
   } catch {
     return { error: 'Cannot reach the bank server. Is the API running?' };
   }

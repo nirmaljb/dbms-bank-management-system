@@ -6,6 +6,7 @@ import { signToken } from '../utils/jwt.js';
 import { validateSignupInput, validateLoginInput, validateAdminLoginInput } from '../utils/validation.js';
 import type { UserRecord } from '../db/user-repository.interface.js';
 import { mapDbError } from '../utils/db-errors.js';
+import { checkPin, DEFAULT_PIN, PIN_PATTERN } from '../services/pin-service.js';
 
 const COOKIE_NAME = 'token';
 
@@ -15,6 +16,8 @@ const publicUser = (user: UserRecord) => ({
   email: user.email,
   role: user.role,
   staffId: user.staffId,
+  // True until the user replaces the default PIN with their own.
+  pinIsDefault: user.pinHash === null,
 });
 
 function getCookieOptions() {
@@ -153,6 +156,36 @@ export class AuthController {
       maxAge: 0,
     });
     return res.status(200).json({ message: 'Logged out successfully' });
+  };
+
+  /** Sets a new PIN. The current PIN (or the default one) stands in for the PIN prompt. */
+  changePin = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const { currentPin, newPin } = (req.body ?? {}) as { currentPin?: unknown; newPin?: unknown };
+    if (typeof newPin !== 'string' || !PIN_PATTERN.test(newPin)) {
+      return res.status(400).json({ error: 'New PIN must be exactly 4 digits' });
+    }
+    if (newPin === DEFAULT_PIN) {
+      return res.status(400).json({ error: 'Choose a PIN other than the default PIN' });
+    }
+    if (newPin === currentPin) {
+      return res.status(400).json({ error: 'New PIN must be different from the current PIN' });
+    }
+
+    try {
+      const result = await checkPin(this.userRepository, req.user.id, currentPin);
+      if (!result.ok) {
+        return res.status(result.status).json({ code: result.code, error: result.error });
+      }
+      await this.userRepository.setPinHash(req.user.id, await hashPassword(newPin));
+      const user = await this.userRepository.findById(req.user.id);
+      return res.status(200).json({ user: publicUser(user!) });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   };
 
   me = async (req: AuthenticatedRequest, res: Response) => {

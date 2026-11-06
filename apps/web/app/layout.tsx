@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "./context/auth-context";
+import { PinPromptProvider } from "./components/PinPrompt";
 import { A11yProvider } from "./context/a11y-context";
 import { PREPAINT_SCRIPT } from "./lib/a11y";
 
@@ -23,7 +24,9 @@ export default function RootLayout({
       </head>
       <body className="bg-[#d4dfea] antialiased">
         <A11yProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <PinPromptProvider>{children}</PinPromptProvider>
+          </AuthProvider>
         </A11yProvider>
       </body>
     </html>

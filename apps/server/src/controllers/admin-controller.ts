@@ -113,6 +113,20 @@ export const adminController = {
     return res.json({ status: body.status });
   },
 
+  // For a customer who forgot their PIN: back to the default PIN, lock cleared.
+  resetCustomerPin: async (req: AuthenticatedRequest, res: Response) => {
+    const [row] = await query<{ name: string }>(
+      `UPDATE users SET pin_hash = NULL, pin_failed_attempts = 0, pin_locked_until = NULL
+       WHERE id = $1::uuid AND role = 'customer'
+       RETURNING name`,
+      [req.params.userId]
+    );
+    if (!row) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    return res.json({ name: row.name });
+  },
+
   transactions: async (req: AuthenticatedRequest, res: Response) => {
     const f = parseOr400(transactionFilterSchema, req.query, res);
     if (!f) return;

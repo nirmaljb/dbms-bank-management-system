@@ -5,6 +5,8 @@ export interface User {
   role: 'customer' | 'admin';
   // Admin ID such as BNBA0001; null for customers.
   staffId: string | null;
+  // True until the user replaces the default PIN with their own.
+  pinIsDefault: boolean;
 }
 
 export interface SignupInput {
@@ -87,6 +89,26 @@ export async function loginUser(
 
 export function adminLoginUser(input: { adminId: string; password: string }) {
   return loginUser(input, '/api/auth/admin/login');
+}
+
+export async function changeUserPin(currentPin: string, newPin: string): Promise<{ user?: User; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPin, newPin }),
+      credentials: 'include',
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { error: data.error || 'Could not change the PIN' };
+    }
+
+    return { user: data.user };
+  } catch {
+    return { error: 'Network error. Please try again later.' };
+  }
 }
 
 export async function logoutUser(): Promise<{ success: boolean; error?: string }> {
