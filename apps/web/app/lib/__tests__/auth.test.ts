@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchMe, signupUser, loginUser, adminLoginUser, logoutUser } from '../auth';
 
+const APPLICATION = {
+  phone: '9876543210',
+  dateOfBirth: '1998-04-15',
+  address: '12 Demo Street, Sample City',
+  branchCode: '0001',
+  accountType: 'SAVINGS' as const,
+};
+
 describe('Frontend Auth API Utilities', () => {
   const originalFetch = global.fetch;
 
@@ -72,6 +80,7 @@ describe('Frontend Auth API Utilities', () => {
         name: 'Jane Doe',
         email: 'jane@example.com',
         password: 'securePassword123',
+        ...APPLICATION,
       });
 
       expect(result.user).toEqual(mockUser);
@@ -89,6 +98,7 @@ describe('Frontend Auth API Utilities', () => {
         name: 'Jane Doe',
         email: 'jane@example.com',
         password: 'securePassword123',
+        ...APPLICATION,
       });
 
       expect(result.user).toBeUndefined();
@@ -145,7 +155,7 @@ describe('Frontend Auth API Utilities', () => {
         json: async () => ({ user: { id: 'a', name: 'Admin', email: 'admin@example.com', role: 'admin' } }),
       } as Response);
 
-      const result = await adminLoginUser({ email: 'admin@example.com', password: 'password123' });
+      const result = await adminLoginUser({ adminId: 'BNBA0001', password: 'password123' });
 
       expect(result.user?.role).toBe('admin');
       expect(global.fetch).toHaveBeenCalledWith('/api/auth/admin/login', expect.objectContaining({ method: 'POST' }));
@@ -158,7 +168,7 @@ describe('Frontend Auth API Utilities', () => {
         json: async () => ({ error: 'This portal is for bank administrators only' }),
       } as Response);
 
-      const result = await adminLoginUser({ email: 'jane@example.com', password: 'password123' });
+      const result = await adminLoginUser({ adminId: 'jane@example.com', password: 'password123' });
 
       expect(result.error).toBe('This portal is for bank administrators only');
     });

@@ -35,34 +35,32 @@ CREATE OR REPLACE TRIGGER trg_transactions_updated_at
   FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
 ------------------------------------------------------------------------------
--- Auto-create a savings account when a customer is inserted
+-- Give every admin a staff ID (BNBA0001, BNBA0002, ...) when the row is
+-- inserted. This is the Admin ID they sign in with at /admin/login.
 ------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_users_create_account()
+CREATE OR REPLACE FUNCTION fn_users_assign_staff_id()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  INSERT INTO accounts (user_id, account_number)
-  VALUES (NEW.id, fn_generate_account_number());
+  IF NEW.role = 'admin' AND NEW.staff_id IS NULL THEN
+    NEW.staff_id := 'BNBA' || lpad(nextval('staff_id_seq')::text, 4, '0');
+  END IF;
   RETURN NEW;
 END;
 $$;
 
-CREATE OR REPLACE TRIGGER trg_users_create_account
-  AFTER INSERT ON users
-  FOR EACH ROW
-  WHEN (NEW.role = 'customer')
-  EXECUTE FUNCTION fn_users_create_account();
+CREATE OR REPLACE TRIGGER trg_users_assign_staff_id
+  BEFORE INSERT ON users
+  FOR EACH ROW EXECUTE FUNCTION fn_users_assign_staff_id();
 
--- Backfill: customers created before this trigger existed get an account too.
-INSERT INTO accounts (user_id, account_number)
-SELECT u.id, fn_generate_account_number()
-FROM users u
-WHERE u.role = 'customer'
-  AND NOT EXISTS (SELECT 1 FROM accounts a WHERE a.user_id = u.id);
+-- Accounts are no longer opened automatically: sp_register_customer files an
+-- application and an admin approves it.
+DROP TRIGGER IF EXISTS trg_users_create_account ON users;
+DROP FUNCTION IF EXISTS fn_users_create_account();
 
 ------------------------------------------------------------------------------
--- Block deposits, withdrawals and loan disbursals on frozen accounts.
+-- Block deposits, withdrawals, transfers and loan disbursals on frozen accounts.
 -- Interest payments, principal repayments and reversals stay allowed, so a
 -- freeze can never force a loan into default.
 ------------------------------------------------------------------------------
@@ -73,7 +71,7 @@ AS $$
 DECLARE
   v_status account_status;
 BEGIN
-  IF NEW.type NOT IN ('DEPOSIT', 'WITHDRAWAL', 'LOAN_DISBURSAL') THEN
+  IF NEW.type NOT IN ('DEPOSIT', 'WITHDRAWAL', 'LOAN_DISBURSAL', 'TRANSFER_OUT', 'TRANSFER_IN') THEN
     RETURN NEW;
   END IF;
   IF NEW.status NOT IN ('PENDING', 'COMPLETED') THEN
@@ -84,6 +82,9 @@ BEGIN
   END IF;
 
   SELECT status INTO v_status FROM accounts WHERE id = NEW.account_id;
+  IF v_status IN ('PENDING', 'REJECTED') THEN
+    RAISE EXCEPTION 'Account is not open: % is not allowed', replace(lower(NEW.type::text), '_', ' ');
+  END IF;
   IF v_status = 'FROZEN' THEN
     RAISE EXCEPTION 'Account is frozen: % is not allowed', replace(lower(NEW.type::text), '_', ' ');
   END IF;
@@ -115,6 +116,7 @@ BEGIN
      OR NEW.amount IS DISTINCT FROM OLD.amount
      OR NEW.loan_id IS DISTINCT FROM OLD.loan_id
      OR NEW.reversal_of IS DISTINCT FROM OLD.reversal_of
+     OR NEW.counterparty_account_id IS DISTINCT FROM OLD.counterparty_account_id
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'Ledger rows cannot be modified (transaction %)', OLD.id;
   END IF;

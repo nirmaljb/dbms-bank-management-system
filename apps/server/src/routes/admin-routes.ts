@@ -9,6 +9,12 @@ export function createAdminRoutes(): Router {
 
   router.get('/overview', handle(a.overview));
 
+  router.get('/branches', handle(a.branches));
+
+  router.get('/applications', handle(a.applications));
+  router.post('/applications/:id/approve', handle(a.approveAccount));
+  router.post('/applications/:id/reject', handle(a.rejectAccount));
+
   router.get('/customers', handle(a.customers));
   router.post('/accounts/:id/status', handle(a.setAccountStatus));
 

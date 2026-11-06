@@ -1,14 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, fetchMe, loginUser, adminLoginUser, signupUser, logoutUser } from '../lib/auth';
+import { User, SignupInput, fetchMe, loginUser, adminLoginUser, signupUser, logoutUser } from '../lib/auth';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (input: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
-  adminLogin: (input: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
-  signup: (input: { name: string; email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  adminLogin: (input: { adminId: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  signup: (input: SignupInput) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: res.error || 'Login failed' };
   };
 
-  const adminLogin = async (input: { email: string; password: string }) => {
+  const adminLogin = async (input: { adminId: string; password: string }) => {
     const res = await adminLoginUser(input);
     if (res.user) {
       setUser(res.user);
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: res.error || 'Login failed' };
   };
 
-  const signup = async (input: { name: string; email: string; password: string }) => {
+  const signup = async (input: SignupInput) => {
     const res = await signupUser(input);
     if (res.user) {
       setUser(res.user);

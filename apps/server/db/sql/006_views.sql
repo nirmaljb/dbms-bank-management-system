@@ -26,6 +26,7 @@ SELECT
   t.status,
   t.loan_id,
   t.reversal_of,
+  cp.account_number AS counterparty_account_number,
   t.created_at,
   t.posted_at,
   CASE WHEN t.posted_at IS NOT NULL THEN
@@ -38,7 +39,8 @@ SELECT
       )
   END AS running_balance
 FROM transactions t
-JOIN accounts a ON a.id = t.account_id;
+JOIN accounts a ON a.id = t.account_id
+LEFT JOIN accounts cp ON cp.id = t.counterparty_account_id;
 
 -- Every transaction with its customer and account, for the admin console.
 CREATE VIEW v_admin_transactions AS
@@ -53,6 +55,7 @@ SELECT
   t.loan_id,
   t.reversal_of,
   rv.id AS reversed_by_txn_id,
+  cp.account_number AS counterparty_account_number,
   t.created_at,
   t.posted_at,
   t.processed_at,
@@ -68,6 +71,7 @@ FROM transactions t
 JOIN accounts a ON a.id = t.account_id
 JOIN users u ON u.id = a.user_id
 LEFT JOIN transactions rv ON rv.reversal_of = t.id
+LEFT JOIN accounts cp ON cp.id = t.counterparty_account_id
 LEFT JOIN users pb ON pb.id = t.processed_by;
 
 -- Loan with its current open due and payment totals.
@@ -120,19 +124,32 @@ LEFT JOIN LATERAL (
   WHERE ld.loan_id = l.id
 ) c ON true;
 
--- One row per customer: account, balance, status, credit score and open loan.
+-- One row per customer: KYC details, branch and IFSC, account (or pending
+-- application), balance, status, credit score and open loan.
 CREATE VIEW v_customer_overview AS
 SELECT
   u.id AS user_id,
   u.name,
   u.email,
+  u.phone,
+  u.date_of_birth,
+  u.address,
   u.created_at AS customer_since,
   a.id AS account_id,
+  a.application_no,
   a.account_number,
   a.account_type,
   a.balance,
   a.status AS account_status,
-  a.created_at AS account_opened_at,
+  a.created_at AS applied_at,
+  a.opened_at AS account_opened_at,
+  a.decision_note,
+  a.decided_at,
+  dby.name AS decided_by_name,
+  b.code AS branch_code,
+  b.name AS branch_name,
+  b.city AS branch_city,
+  b.ifsc,
   fn_credit_score(u.id) AS credit_score,
   ol.id AS open_loan_id,
   ol.status AS open_loan_status,
@@ -140,5 +157,7 @@ SELECT
   ol.outstanding_principal AS open_loan_outstanding
 FROM users u
 JOIN accounts a ON a.user_id = u.id
+JOIN branches b ON b.code = a.branch_code
+LEFT JOIN users dby ON dby.id = a.decided_by
 LEFT JOIN loans ol ON ol.user_id = u.id AND ol.status IN ('PENDING', 'ACTIVE')
 WHERE u.role = 'customer';

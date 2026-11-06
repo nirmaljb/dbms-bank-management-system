@@ -4,6 +4,15 @@ import { createApp } from '../app.js';
 import { InMemoryUserRepository } from '../services/in-memory-user-repository.js';
 import { hashPassword } from '../utils/password.js';
 
+// The account-opening fields every registration needs besides login details.
+const APPLICATION = {
+  phone: '9876543210',
+  dateOfBirth: '1998-04-15',
+  address: '12 Demo Street, Sample City',
+  branchCode: '0001',
+  accountType: 'SAVINGS',
+};
+
 describe('Auth API Endpoints', () => {
   let userRepository: InMemoryUserRepository;
   let app: ReturnType<typeof createApp>;
@@ -21,6 +30,7 @@ describe('Auth API Endpoints', () => {
           name: 'Jane Doe',
           email: 'jane@example.com',
           password: 'securePassword123',
+          ...APPLICATION,
         });
 
       expect(res.status).toBe(201);
@@ -49,6 +59,7 @@ describe('Auth API Endpoints', () => {
           name: 'Jane Doe',
           email: 'jane@example.com',
           password: 'securePassword123',
+          ...APPLICATION,
         });
 
       expect(res.status).toBe(409);
@@ -62,6 +73,7 @@ describe('Auth API Endpoints', () => {
           name: 'Jane Doe',
           email: 'jane@example.com',
           password: 'short',
+          ...APPLICATION,
         });
 
       expect(res.status).toBe(400);
@@ -75,9 +87,19 @@ describe('Auth API Endpoints', () => {
           name: 'Jane Doe',
           email: 'invalid-email',
           password: 'securePassword123',
+          ...APPLICATION,
         });
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when the account-opening details are missing', async () => {
+      const res = await request(app)
+        .post('/api/auth/signup')
+        .send({ name: 'Jane Doe', email: 'jane@example.com', password: 'securePassword123' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/mobile/i);
     });
   });
 
@@ -168,6 +190,15 @@ describe('Auth API Endpoints', () => {
       expect(res.body.user.role).toBe('admin');
     });
 
+    it('logs an admin in with their Admin ID, in any case', async () => {
+      const res = await request(app)
+        .post('/api/auth/admin/login')
+        .send({ adminId: 'bnba0001', password: 'adminPassword123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.staffId).toBe('BNBA0001');
+    });
+
     it('rejects a customer on the admin login', async () => {
       const res = await request(app)
         .post('/api/auth/admin/login')
@@ -180,10 +211,10 @@ describe('Auth API Endpoints', () => {
     it('returns the generic 401 for a wrong admin password', async () => {
       const res = await request(app)
         .post('/api/auth/admin/login')
-        .send({ email: 'admin@example.com', password: 'wrong' });
+        .send({ adminId: 'BNBA0001', password: 'wrong' });
 
       expect(res.status).toBe(401);
-      expect(res.body.error).toBe('Invalid email or password');
+      expect(res.body.error).toBe('Invalid Admin ID or password');
     });
   });
 
@@ -242,6 +273,7 @@ describe('Auth API Endpoints', () => {
           name: 'Jane Doe',
           email: 'jane@example.com',
           password: 'securePassword123',
+          ...APPLICATION,
         });
 
       const cookie = signupRes.headers['set-cookie'] as string[] | undefined;

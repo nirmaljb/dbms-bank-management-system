@@ -10,6 +10,8 @@ export function createCustomerRoutes(): Router {
   router.get('/overview', handle(c.overview));
   router.post('/deposit', handle(c.deposit));
   router.post('/withdraw', handle(c.withdraw));
+  router.get('/payee', handle(c.lookupPayee));
+  router.post('/transfer', handle(c.transfer));
   router.get('/statement', handle(c.statement));
 
   router.get('/loans', handle(c.loans));

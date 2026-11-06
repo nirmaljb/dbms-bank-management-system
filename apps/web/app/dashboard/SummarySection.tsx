@@ -8,6 +8,8 @@ import {
   formatDateTime,
   formatINR,
   TXN_TYPE_LABELS,
+  formatAccountNumber,
+  ACCOUNT_TYPE_LABELS,
   type CustomerOverview,
   type StatementRow,
 } from '../lib/api';
@@ -30,12 +32,16 @@ export function SummarySection({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
       <div className="lg:col-span-8 space-y-3">
-        <Panel title="🏦 Savings Account" right={<StatusBadge status={overview.account_status} />}>
+        <Panel
+          title={`🏦 ${ACCOUNT_TYPE_LABELS[overview.account_type]} Account`}
+          right={<StatusBadge status={overview.account_status} />}
+        >
           <table className="bank-table">
             <thead>
               <tr>
                 <th>Account Number</th>
-                <th>Type</th>
+                <th>IFSC</th>
+                <th>Branch</th>
                 <th>Holder</th>
                 <th>Opened</th>
                 <th className="text-right">Available Balance</th>
@@ -43,8 +49,11 @@ export function SummarySection({
             </thead>
             <tbody>
               <tr>
-                <td className="font-mono font-bold">{overview.account_number}</td>
-                <td>{overview.account_type}</td>
+                <td className="font-mono font-bold whitespace-nowrap">{formatAccountNumber(overview.account_number)}</td>
+                <td className="font-mono">{overview.ifsc}</td>
+                <td>
+                  {overview.branch_name}, {overview.branch_city}
+                </td>
                 <td>{overview.name}</td>
                 <td>{formatDate(overview.account_opened_at)}</td>
                 <td className="text-right font-mono font-extrabold text-[#006600] text-sm">
@@ -59,6 +68,9 @@ export function SummarySection({
             </button>
             <button type="button" className="bank-btn" onClick={() => onNavigate('withdraw')}>
               Withdraw
+            </button>
+            <button type="button" className="bank-btn" onClick={() => onNavigate('transfer')}>
+              Transfer
             </button>
             <button type="button" className="bank-btn-secondary" onClick={() => onNavigate('statement')}>
               Full Statement

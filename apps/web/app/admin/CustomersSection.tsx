@@ -2,7 +2,15 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Panel, StatusBadge, FlashMessage, EmptyRow, LoadingRow, PromptDialog, type Flash } from '../components/ui';
-import { apiGet, apiPost, formatDate, formatINR, type CustomerOverview } from '../lib/api';
+import {
+  apiGet,
+  apiPost,
+  formatAccountNumber,
+  formatDate,
+  formatINR,
+  ACCOUNT_TYPE_LABELS,
+  type CustomerOverview,
+} from '../lib/api';
 
 export function CustomersSection({ onChange }: { onChange: () => void }) {
   const [customers, setCustomers] = useState<CustomerOverview[] | null>(null);
@@ -41,7 +49,12 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
 
   const q = search.trim().toLowerCase();
   const visible = (customers ?? []).filter(
-    (c) => !q || c.name.toLowerCase().includes(q) || c.email.includes(q) || c.account_number.startsWith(q)
+    (c) =>
+      !q ||
+      c.name.toLowerCase().includes(q) ||
+      c.email.includes(q) ||
+      (c.account_number ?? '').startsWith(q.replace(/\s/g, '')) ||
+      c.ifsc.toLowerCase() === q
   );
 
   return (
@@ -54,7 +67,7 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
         <FlashMessage flash={flash} onClose={() => setFlash(null)} />
         <input
           className="bank-input w-full max-w-sm"
-          placeholder="Search by name, email or account number"
+          placeholder="Search by name, email, account number or IFSC"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -65,6 +78,7 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
             <tr>
               <th>Customer</th>
               <th>Account</th>
+              <th>Branch / IFSC</th>
               <th className="text-right">Balance</th>
               <th>Status</th>
               <th className="text-right">Credit score</th>
@@ -75,9 +89,9 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
           </thead>
           <tbody>
             {customers === null ? (
-              <LoadingRow colSpan={8} />
+              <LoadingRow colSpan={9} />
             ) : visible.length === 0 ? (
-              <EmptyRow colSpan={8} text="No customers found." />
+              <EmptyRow colSpan={9} text="No customers found." />
             ) : (
               visible.map((c) => (
                 <tr key={c.user_id}>
@@ -85,7 +99,14 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
                     <div className="font-bold">{c.name}</div>
                     <div className="text-[10px] text-slate-500">{c.email}</div>
                   </td>
-                  <td className="font-mono">{c.account_number}</td>
+                  <td>
+                    <div className="font-mono whitespace-nowrap">{formatAccountNumber(c.account_number)}</div>
+                    <div className="text-[10px] text-slate-500">{ACCOUNT_TYPE_LABELS[c.account_type]}</div>
+                  </td>
+                  <td>
+                    <div>{c.branch_city}</div>
+                    <div className="font-mono text-[10px] text-slate-500">{c.ifsc}</div>
+                  </td>
                   <td className="text-right font-mono">{formatINR(c.balance)}</td>
                   <td>
                     <StatusBadge status={c.account_status} />
@@ -128,7 +149,7 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
         message={
           target?.account_status === 'FROZEN'
             ? `Unfreeze account ${target?.account_number} (${target?.name})? Deposits, withdrawals and loans will be allowed again.`
-            : `Freeze account ${target?.account_number} (${target?.name})?\nDeposits, withdrawals, loan requests and disbursals will be blocked. The customer can still pay loan dues.`
+            : `Freeze account ${target?.account_number} (${target?.name})?\nDeposits, withdrawals, transfers, loan requests and disbursals will be blocked. The customer can still pay loan dues.`
         }
         confirmText={target?.account_status === 'FROZEN' ? 'Unfreeze' : 'Freeze'}
         danger={target?.account_status !== 'FROZEN'}

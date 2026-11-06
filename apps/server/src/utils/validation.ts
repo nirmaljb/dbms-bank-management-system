@@ -1,9 +1,21 @@
 import { z } from 'zod';
 
+// Age, address length and branch existence are re-checked by sp_register_customer.
 export const signupSchema = z.object({
-  name: z.string().trim().min(2, { message: 'Name must be at least 2 characters long' }),
+  name: z.string().trim().min(2, { message: 'Name must be at least 2 characters long' }).max(100),
   email: z.string().trim().email({ message: 'Invalid email address' }),
   password: z.string().min(8, { message: 'Password must be at least 8 characters long' }),
+  phone: z
+    .string({ required_error: 'Enter a valid 10-digit mobile number' })
+    .trim()
+    .regex(/^[6-9]\d{9}$/, { message: 'Enter a valid 10-digit mobile number' }),
+  dateOfBirth: z.string({ required_error: 'Enter your date of birth' }).regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Enter your date of birth' }),
+  address: z.string({ required_error: 'Enter your address' }).trim().min(10, { message: 'Enter your full address (at least 10 characters)' }).max(300),
+  branchCode: z.string({ required_error: 'Choose a branch' }).regex(/^\d{4}$/, { message: 'Choose a branch' }),
+  accountType: z.enum(['SAVINGS', 'CURRENT'], {
+    required_error: 'Choose an account type',
+    invalid_type_error: 'Choose an account type',
+  }),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
@@ -15,12 +27,26 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// Admins sign in with their Admin ID (BNBA0001) or their email.
+export const adminLoginSchema = z
+  .object({
+    adminId: z.string().trim().optional(),
+    email: z.string().trim().optional(),
+    password: z.string().min(1, { message: 'Password is required' }),
+  })
+  .transform(({ adminId, email, password }) => ({ adminId: (adminId || email || '').trim(), password }))
+  .refine((v) => v.adminId.length > 0, { message: 'Admin ID is required' });
+
 export function validateSignupInput(data: unknown) {
   return signupSchema.safeParse(data);
 }
 
 export function validateLoginInput(data: unknown) {
   return loginSchema.safeParse(data);
+}
+
+export function validateAdminLoginInput(data: unknown) {
+  return adminLoginSchema.safeParse(data);
 }
 
 // Amounts travel as strings so no precision is lost before Postgres sees
@@ -35,6 +61,27 @@ export const amountBodySchema = z.object({ amount: amountSchema });
 export const loanRequestSchema = z.object({
   amount: amountSchema,
   purpose: z.string().trim().min(3, { message: 'Purpose must be at least 3 characters' }).max(200),
+});
+
+// Spaces are allowed in the account number (people copy "0001 1000 0015").
+// Check digit and IFSC rules are enforced by fn_find_payee.
+const payeeFields = {
+  accountNumber: z
+    .string()
+    .transform((v) => v.replace(/\s/g, ''))
+    .refine((v) => /^\d{12}$/.test(v), { message: 'Account number must be 12 digits' }),
+  ifsc: z
+    .string()
+    .transform((v) => v.trim().toUpperCase())
+    .refine((v) => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), { message: 'IFSC must be 11 characters, e.g. BNBK0000001' }),
+};
+
+export const payeeLookupSchema = z.object(payeeFields);
+
+export const transferSchema = z.object({
+  ...payeeFields,
+  amount: amountSchema,
+  remarks: z.string().trim().max(100).optional(),
 });
 
 export const sanctionLoanSchema = z.object({
@@ -72,11 +119,24 @@ export const statementQuerySchema = z.object({
 export const transactionFilterSchema = z.object({
   customer: z.string().trim().max(100).optional(),
   type: z
-    .enum(['DEPOSIT', 'WITHDRAWAL', 'REVERSAL', 'LOAN_DISBURSAL', 'INTEREST_PAYMENT', 'PRINCIPAL_REPAYMENT'])
+    .enum([
+      'DEPOSIT',
+      'WITHDRAWAL',
+      'TRANSFER_OUT',
+      'TRANSFER_IN',
+      'REVERSAL',
+      'LOAN_DISBURSAL',
+      'INTEREST_PAYMENT',
+      'PRINCIPAL_REPAYMENT',
+    ])
     .optional(),
   status: z.enum(['PENDING', 'COMPLETED', 'REJECTED', 'REVERSED']).optional(),
   from: dateString,
   to: dateString,
+});
+
+export const applicationFilterSchema = z.object({
+  status: z.enum(['PENDING', 'ACTIVE', 'FROZEN', 'REJECTED']).optional(),
 });
 
 export const loanFilterSchema = z.object({

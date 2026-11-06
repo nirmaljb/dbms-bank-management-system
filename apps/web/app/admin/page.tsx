@@ -11,8 +11,9 @@ import { CustomersSection } from './CustomersSection';
 import { TransactionsSection } from './TransactionsSection';
 import { LoansSection } from './LoansSection';
 import { NoticesSection } from './NoticesSection';
+import { ApplicationsSection } from './ApplicationsSection';
 
-type Tab = 'overview' | 'customers' | 'transactions' | 'loans' | 'notices';
+type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'loans' | 'notices';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -45,6 +46,7 @@ export default function AdminPage() {
 
   const navItems: NavItem[] = [
     { id: 'overview', label: '🏛️ Overview' },
+    { id: 'applications', label: '📝 Applications', badge: stats?.pending_applications || undefined },
     { id: 'customers', label: '👥 Customers' },
     { id: 'transactions', label: '🧾 Transactions', badge: stats?.pending_withdrawals || undefined },
     { id: 'loans', label: '🤝 Loans', badge: stats?.pending_loans || undefined },
@@ -72,6 +74,7 @@ export default function AdminPage() {
 
       <main id="main-content" className="p-3 sm:p-4 bg-[#f4f7fa] flex-1">
         {tab === 'overview' && <OverviewSection stats={stats} error={statsError} onNavigate={go} />}
+        {tab === 'applications' && <ApplicationsSection onChange={refreshStats} />}
         {tab === 'customers' && <CustomersSection onChange={refreshStats} />}
         {tab === 'transactions' && <TransactionsSection preset={txnPreset} onChange={refreshStats} />}
         {tab === 'loans' && <LoansSection onChange={refreshStats} />}

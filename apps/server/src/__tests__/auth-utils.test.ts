@@ -41,6 +41,11 @@ describe('Input Validation', () => {
       name: 'Jane Doe',
       email: 'jane@example.com',
       password: 'securePassword123',
+      phone: '9876543210',
+      dateOfBirth: '1998-04-15',
+      address: '12 Demo Street, Sample City',
+      branchCode: '0001',
+      accountType: 'SAVINGS',
     });
 
     expect(result.success).toBe(true);

@@ -56,7 +56,9 @@ export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <div className="text-[11px] font-bold text-white">{user.name}</div>
-                <div className="text-[9.5px] text-[#c2daf2]">{user.role === 'admin' ? 'Administrator' : 'Customer'}</div>
+                <div className="text-[9.5px] text-[#c2daf2]">
+                  {user.role === 'admin' ? `Administrator · ${user.staffId ?? ''}` : 'Customer'}
+                </div>
               </div>
               <button
                 type="button"

@@ -3,9 +3,19 @@ import type { IUserRepository } from '../db/user-repository.interface.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { signToken } from '../utils/jwt.js';
-import { validateSignupInput, validateLoginInput } from '../utils/validation.js';
+import { validateSignupInput, validateLoginInput, validateAdminLoginInput } from '../utils/validation.js';
+import type { UserRecord } from '../db/user-repository.interface.js';
+import { mapDbError } from '../utils/db-errors.js';
 
 const COOKIE_NAME = 'token';
+
+const publicUser = (user: UserRecord) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  staffId: user.staffId,
+});
 
 function getCookieOptions() {
   return {
@@ -29,7 +39,7 @@ export class AuthController {
         });
       }
 
-      const { name, email, password } = validation.data;
+      const { name, email, password, ...application } = validation.data;
       const normalizedEmail = email.toLowerCase().trim();
 
       const existingUser = await this.userRepository.findByEmail(normalizedEmail);
@@ -43,6 +53,7 @@ export class AuthController {
         email: normalizedEmail,
         passwordHash,
         role: 'customer',
+        application,
       });
 
       const token = signToken({
@@ -54,49 +65,59 @@ export class AuthController {
 
       res.cookie(COOKIE_NAME, token, getCookieOptions());
 
-      return res.status(201).json({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      });
+      return res.status(201).json({ user: publicUser(user) });
     } catch (err) {
-      return res.status(500).json({ error: 'Internal server error' });
+      // sp_register_customer rejects bad age, address or branch with a message.
+      const { status, message } = mapDbError(err);
+      if (status === 500) console.error(err);
+      return res.status(status).json({ error: message });
     }
   };
 
-  /** Customer login. Admins are turned away to the admin portal. */
-  login = (req: AuthenticatedRequest, res: Response) => this.loginAs('customer', req, res);
+  /** Customer login with email. Admins are turned away to the admin portal. */
+  login = async (req: AuthenticatedRequest, res: Response) => {
+    const validation = validateLoginInput(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: validation.error.errors[0]?.message || 'Invalid email or password',
+      });
+    }
+    const { email, password } = validation.data;
+    return this.loginAs('customer', () => this.userRepository.findByEmail(email), password, res);
+  };
 
-  /** Admin login. Customers are turned away. */
-  adminLogin = (req: AuthenticatedRequest, res: Response) => this.loginAs('admin', req, res);
+  /** Admin login with Admin ID (e.g. BNBA0001) or email. Customers are turned away. */
+  adminLogin = async (req: AuthenticatedRequest, res: Response) => {
+    const validation = validateAdminLoginInput(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: validation.error.errors[0]?.message || 'Invalid Admin ID or password',
+      });
+    }
+    const { adminId, password } = validation.data;
+    const find = () =>
+      adminId.includes('@')
+        ? this.userRepository.findByEmail(adminId)
+        : this.userRepository.findByStaffId(adminId);
+    return this.loginAs('admin', find, password, res);
+  };
 
   private loginAs = async (
     role: 'customer' | 'admin',
-    req: AuthenticatedRequest,
+    findUser: () => Promise<UserRecord | null>,
+    password: string,
     res: Response
   ) => {
+    const invalid = role === 'admin' ? 'Invalid Admin ID or password' : 'Invalid email or password';
     try {
-      const validation = validateLoginInput(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: validation.error.errors[0]?.message || 'Invalid email or password',
-        });
-      }
-
-      const { email, password } = validation.data;
-      const normalizedEmail = email.toLowerCase().trim();
-
-      const user = await this.userRepository.findByEmail(normalizedEmail);
+      const user = await findUser();
       if (!user) {
-        return res.status(401).json({ error: 'Invalid email or password' });
+        return res.status(401).json({ error: invalid });
       }
 
       const isPasswordValid = await comparePassword(password, user.passwordHash);
       if (!isPasswordValid) {
-        return res.status(401).json({ error: 'Invalid email or password' });
+        return res.status(401).json({ error: invalid });
       }
 
       if (user.role !== role) {
@@ -117,14 +138,7 @@ export class AuthController {
 
       res.cookie(COOKIE_NAME, token, getCookieOptions());
 
-      return res.status(200).json({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      });
+      return res.status(200).json({ user: publicUser(user) });
     } catch (err) {
       return res.status(500).json({ error: 'Internal server error' });
     }
@@ -152,14 +166,7 @@ export class AuthController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      return res.status(200).json({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      });
+      return res.status(200).json({ user: publicUser(user) });
     } catch (err) {
       return res.status(500).json({ error: 'Internal server error' });
     }

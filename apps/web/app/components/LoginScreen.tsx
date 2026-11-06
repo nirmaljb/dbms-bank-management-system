@@ -8,9 +8,11 @@ import { BankHeader } from './BankHeader';
 import { BankFooter } from './BankFooter';
 import { CaptchaBox, useCaptcha } from './CaptchaBox';
 
+// Customers sign in with their email, admins with the Admin ID the bank
+// issued them (seeded by db:setup; admins cannot register themselves).
 const DEMO = {
-  customer: { email: 'demo@example.com', password: 'password123' },
-  admin: { email: 'admin@example.com', password: 'password123' },
+  customer: { login: 'demo@example.com', password: 'password123' },
+  admin: { login: 'BNBA0001', password: 'password123' },
 };
 
 const homeFor = (role: 'customer' | 'admin') => (role === 'admin' ? '/admin' : '/dashboard');
@@ -44,8 +46,8 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
     const errors: { email?: string; password?: string; captcha?: string } = {};
 
     if (!email.trim()) {
-      errors.email = 'Email address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = isAdmin ? 'Admin ID is required' : 'Email address is required';
+    } else if (!isAdmin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errors.email = 'Please enter a valid email address';
     }
 
@@ -73,12 +75,13 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
 
     setIsSubmitting(true);
     try {
-      const doLogin = isAdmin ? adminLogin : login;
-      const result = await doLogin({ email: email.trim(), password });
+      const result = isAdmin
+        ? await adminLogin({ adminId: email.trim(), password })
+        : await login({ email: email.trim(), password });
       if (result.success) {
         router.push(homeFor(mode));
       } else {
-        setGeneralError(result.error || 'Invalid email or password');
+        setGeneralError(result.error || (isAdmin ? 'Invalid Admin ID or password' : 'Invalid email or password'));
       }
     } catch {
       setGeneralError('Could not reach the bank server. Please retry.');
@@ -88,7 +91,7 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
   };
 
   const handleFillDemo = () => {
-    setEmail(DEMO[mode].email);
+    setEmail(DEMO[mode].login);
     setPassword(DEMO[mode].password);
     setCaptchaInput(captcha.code);
     setFieldErrors({});
@@ -116,13 +119,14 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
               <form onSubmit={handleSubmit} className="space-y-3" noValidate>
                 <div>
                   <label htmlFor="email" className="block text-xs font-bold text-[#003366] mb-0.5">
-                    Email
+                    {isAdmin ? 'Admin ID' : 'Email'}
                   </label>
                   <input
                     id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
+                    name={isAdmin ? 'adminId' : 'email'}
+                    type={isAdmin ? 'text' : 'email'}
+                    autoComplete="username"
+                    placeholder={isAdmin ? 'e.g. BNBA0001' : undefined}
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -131,6 +135,11 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
                     className="bank-input w-full"
                   />
                   {fieldErrors.email && <p className="mt-0.5 text-[10.5px] text-red-700 font-bold">{fieldErrors.email}</p>}
+                  {isAdmin && (
+                    <p className="mt-0.5 text-[10.5px] text-slate-500">
+                      Issued by the bank when your admin account is created. Your email also works.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -202,7 +211,7 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
                   type="button"
                   onClick={handleFillDemo}
                   className="text-slate-600 hover:underline bg-transparent border-0 cursor-pointer p-0"
-                  title={`${DEMO[mode].email} / ${DEMO[mode].password}`}
+                  title={`${DEMO[mode].login} / ${DEMO[mode].password}`}
                 >
                   Fill demo {isAdmin ? 'admin' : 'customer'}
                 </button>

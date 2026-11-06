@@ -7,7 +7,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE account_status AS ENUM ('ACTIVE', 'FROZEN');
+  -- PENDING: applied online, waiting for an admin. REJECTED: application refused.
+  -- Only ACTIVE and FROZEN accounts have an account number.
+  CREATE TYPE account_status AS ENUM ('PENDING', 'ACTIVE', 'FROZEN', 'REJECTED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -17,13 +19,19 @@ DO $$ BEGIN
     'REVERSAL',
     'LOAN_DISBURSAL',
     'INTEREST_PAYMENT',
-    'PRINCIPAL_REPAYMENT'
+    'PRINCIPAL_REPAYMENT',
+    'TRANSFER_OUT',
+    'TRANSFER_IN'
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- CR adds to the balance, DR subtracts from it.
 DO $$ BEGIN
   CREATE TYPE txn_direction AS ENUM ('CR', 'DR');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE account_type AS ENUM ('SAVINGS', 'CURRENT');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN

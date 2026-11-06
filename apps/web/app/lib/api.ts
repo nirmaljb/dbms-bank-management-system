@@ -59,6 +59,8 @@ export function formatDate(value: string | null | undefined): string {
 export const TXN_TYPE_LABELS: Record<TxnType, string> = {
   DEPOSIT: 'Deposit',
   WITHDRAWAL: 'Withdrawal',
+  TRANSFER_OUT: 'Transfer sent',
+  TRANSFER_IN: 'Transfer received',
   REVERSAL: 'Reversal',
   LOAN_DISBURSAL: 'Loan disbursal',
   INTEREST_PAYMENT: 'Interest payment',
@@ -68,25 +70,67 @@ export const TXN_TYPE_LABELS: Record<TxnType, string> = {
 export type TxnType =
   | 'DEPOSIT'
   | 'WITHDRAWAL'
+  | 'TRANSFER_OUT'
+  | 'TRANSFER_IN'
   | 'REVERSAL'
   | 'LOAN_DISBURSAL'
   | 'INTEREST_PAYMENT'
   | 'PRINCIPAL_REPAYMENT';
 export type TxnStatus = 'PENDING' | 'COMPLETED' | 'REJECTED' | 'REVERSED';
 export type LoanStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'CLOSED' | 'DEFAULTED';
-export type AccountStatus = 'ACTIVE' | 'FROZEN';
+export type AccountStatus = 'PENDING' | 'ACTIVE' | 'FROZEN' | 'REJECTED';
+export type AccountType = 'SAVINGS' | 'CURRENT';
+
+export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  SAVINGS: 'Savings',
+  CURRENT: 'Current',
+};
+
+export interface Branch {
+  code: string;
+  name: string;
+  city: string;
+  ifsc: string;
+}
+
+export interface Payee {
+  account_number: string;
+  holder_name: string;
+  branch_name: string;
+  branch_city: string;
+  ifsc: string;
+}
+
+/** "000110000015" -> "0001 10 00001 5": branch, product, sequence, check digit. */
+export function formatAccountNumber(n: string | null | undefined): string {
+  if (!n) return '—';
+  return /^\d{12}$/.test(n) ? `${n.slice(0, 4)} ${n.slice(4, 6)} ${n.slice(6, 11)} ${n.slice(11)}` : n;
+}
 
 export interface CustomerOverview {
   user_id: string;
   name: string;
   email: string;
+  phone: string;
+  date_of_birth: string;
+  address: string;
   customer_since: string;
   account_id: string;
-  account_number: string;
-  account_type: string;
+  application_no: string;
+  // null until an admin approves the application
+  account_number: string | null;
+  account_type: AccountType;
   balance: string;
   account_status: AccountStatus;
-  account_opened_at: string;
+  applied_at: string;
+  account_opened_at: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+  decided_by_name: string | null;
+  branch_code: string;
+  branch_name: string;
+  branch_city: string;
+  ifsc: string;
   credit_score: number;
   open_loan_id: string | null;
   open_loan_status: LoanStatus | null;
@@ -108,6 +152,7 @@ export interface StatementRow {
   debit: string | null;
   status: TxnStatus;
   reversal_of: string | null;
+  counterparty_account_number: string | null;
   created_at: string;
   posted_at: string | null;
   running_balance: string | null;
@@ -123,6 +168,7 @@ export interface AdminTransaction {
   remarks: string | null;
   reversal_of: string | null;
   reversed_by_txn_id: string | null;
+  counterparty_account_number: string | null;
   created_at: string;
   posted_at: string | null;
   processed_at: string | null;
@@ -209,8 +255,16 @@ export interface AdminNotice {
   read_count: number;
 }
 
+export interface AdminBranch extends Branch {
+  open_accounts: number;
+  pending_applications: number;
+  deposits: string;
+}
+
 export interface AdminStats {
   customer_count: number;
+  pending_applications: number;
+  branch_count: number;
   total_deposits: string;
   frozen_accounts: number;
   pending_withdrawals: number;

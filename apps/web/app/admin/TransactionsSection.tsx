@@ -182,6 +182,8 @@ export function TransactionsSection({
                     <div className="text-[10px] text-slate-500">
                       {t.reversal_of && `of #${t.reversal_of}`}
                       {t.reversed_by_txn_id && `reversed by #${t.reversed_by_txn_id}`}
+                      {t.counterparty_account_number &&
+                        `${t.type === 'TRANSFER_OUT' ? 'to' : 'from'} ${t.counterparty_account_number}`}
                       {t.remarks && ` · ${t.remarks}`}
                     </div>
                   </td>

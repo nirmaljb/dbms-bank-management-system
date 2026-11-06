@@ -5,6 +5,8 @@ import {
   parseOr400,
   amountBodySchema,
   loanRequestSchema,
+  payeeLookupSchema,
+  transferSchema,
   statementQuerySchema,
 } from '../utils/validation.js';
 
@@ -26,7 +28,7 @@ export const customerController = {
       [userId(req)]
     );
     if (!account) {
-      return res.status(404).json({ error: 'No savings account found for this customer' });
+      return res.status(404).json({ error: 'No account found for this customer' });
     }
     return res.json({ account });
   },
@@ -51,6 +53,26 @@ export const customerController = {
       [userId(req), body.amount]
     );
     return res.status(201).json({ txnId: row.p_txn_id, status: row.p_status });
+  },
+
+  // Shows the payee's masked name and branch so the customer can confirm
+  // before sending. Check digit and IFSC are validated by fn_find_payee.
+  lookupPayee: async (req: AuthenticatedRequest, res: Response) => {
+    const body = parseOr400(payeeLookupSchema, req.query, res);
+    if (!body) return;
+    const [payee] = await query(`SELECT * FROM fn_lookup_payee($1, $2)`, [body.accountNumber, body.ifsc]);
+    return res.json({ payee });
+  },
+
+  transfer: async (req: AuthenticatedRequest, res: Response) => {
+    const body = parseOr400(transferSchema, req.body, res);
+    if (!body) return;
+    const row = await callAs<{ p_txn_id: string }>(
+      userId(req),
+      'CALL sp_transfer($1, $2, $3, $4::numeric, $5, NULL)',
+      [userId(req), body.accountNumber, body.ifsc, body.amount, body.remarks ?? null]
+    );
+    return res.status(201).json({ txnId: row.p_txn_id, status: 'COMPLETED' });
   },
 
   statement: async (req: AuthenticatedRequest, res: Response) => {

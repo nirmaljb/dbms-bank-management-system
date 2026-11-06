@@ -40,7 +40,9 @@ BEGIN
 END;
 $$;
 
--- Returns the customer's account row, locked FOR UPDATE for the rest of the transaction.
+-- Returns the customer's account row, locked FOR UPDATE for the rest of the
+-- transaction. Raises if the account has not been approved, so no money can
+-- move through an account that is still an application.
 CREATE OR REPLACE FUNCTION fn_lock_customer_account(p_user_id uuid)
 RETURNS accounts
 LANGUAGE plpgsql
@@ -55,27 +57,41 @@ BEGIN
   FOR UPDATE OF a;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'No savings account found for this customer'
+    RAISE EXCEPTION 'No account found for this customer'
       USING ERRCODE = 'no_data_found';
+  END IF;
+  IF v_account.status = 'PENDING' THEN
+    RAISE EXCEPTION 'Your account application is still awaiting approval by the bank';
+  END IF;
+  IF v_account.status = 'REJECTED' THEN
+    RAISE EXCEPTION 'Your account application was rejected by the bank';
   END IF;
   RETURN v_account;
 END;
 $$;
 
--- Random 11-digit account number that does not start with 0 and is not taken.
-CREATE OR REPLACE FUNCTION fn_generate_account_number()
-RETURNS char(11)
+-- Next account number for a branch and product: branch (4) + product (2) +
+-- sequence (5) + Luhn check digit (1). The sequence is shared by all
+-- branches, so numbers never repeat even across branches.
+CREATE OR REPLACE FUNCTION fn_generate_account_number(p_branch_code char(4), p_type account_type)
+RETURNS char(12)
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_number char(11);
+  v_payload text;
 BEGIN
-  LOOP
-    v_number := (10000000000 + floor(random() * 90000000000))::bigint::text;
-    EXIT WHEN NOT EXISTS (SELECT 1 FROM accounts WHERE account_number = v_number);
-  END LOOP;
-  RETURN v_number;
+  v_payload := p_branch_code || fn_product_code(p_type) || lpad(nextval('account_number_seq')::text, 5, '0');
+  RETURN (v_payload || fn_luhn_check_digit(v_payload))::char(12);
 END;
+$$;
+
+-- IFSC shape: 4 letters, a 0, then 6 letters or digits.
+CREATE OR REPLACE FUNCTION fn_is_valid_ifsc(p_ifsc text)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT coalesce(p_ifsc ~ '^[A-Z]{4}0[A-Z0-9]{6}$', false);
 $$;
 
 -- Whole months between two timestamps.
@@ -110,8 +126,8 @@ AS $$
         WHERE user_id = p_user_id AND status = 'CLOSED')::integer     AS loans_closed,
       (SELECT count(*) FROM loans
         WHERE user_id = p_user_id AND status = 'DEFAULTED')::integer  AS loans_defaulted,
-      coalesce((SELECT fn_months_between(created_at, now()) FROM accounts
-        WHERE user_id = p_user_id), 0)                                AS account_months
+      coalesce((SELECT fn_months_between(opened_at, now()) FROM accounts
+        WHERE user_id = p_user_id AND opened_at IS NOT NULL), 0)                                AS account_months
   )
   SELECT c.sort_order, c.component, c.occurrences, c.points
   FROM stats s

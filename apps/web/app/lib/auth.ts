@@ -3,6 +3,19 @@ export interface User {
   name: string;
   email: string;
   role: 'customer' | 'admin';
+  // Admin ID such as BNBA0001; null for customers.
+  staffId: string | null;
+}
+
+export interface SignupInput {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  dateOfBirth: string;
+  address: string;
+  branchCode: string;
+  accountType: 'SAVINGS' | 'CURRENT';
 }
 
 export async function fetchMe(): Promise<User | null> {
@@ -29,11 +42,7 @@ export async function fetchMe(): Promise<User | null> {
   }
 }
 
-export async function signupUser(input: {
-  name: string;
-  email: string;
-  password: string;
-}): Promise<{ user?: User; error?: string }> {
+export async function signupUser(input: SignupInput): Promise<{ user?: User; error?: string }> {
   try {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
@@ -54,10 +63,7 @@ export async function signupUser(input: {
 }
 
 export async function loginUser(
-  input: {
-    email: string;
-    password: string;
-  },
+  input: { email: string; password: string } | { adminId: string; password: string },
   endpoint: '/api/auth/login' | '/api/auth/admin/login' = '/api/auth/login'
 ): Promise<{ user?: User; error?: string }> {
   try {
@@ -70,7 +76,7 @@ export async function loginUser(
 
     const data = await res.json();
     if (!res.ok) {
-      return { error: data.error || 'Invalid email or password' };
+      return { error: data.error || 'Invalid login details' };
     }
 
     return { user: data.user };
@@ -79,7 +85,7 @@ export async function loginUser(
   }
 }
 
-export function adminLoginUser(input: { email: string; password: string }) {
+export function adminLoginUser(input: { adminId: string; password: string }) {
   return loginUser(input, '/api/auth/admin/login');
 }
 

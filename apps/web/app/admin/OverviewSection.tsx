@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Panel, StatTile, FlashMessage } from '../components/ui';
-import { formatINR, type AdminStats } from '../lib/api';
+import React, { useEffect, useState } from 'react';
+import { Panel, StatTile, FlashMessage, LoadingRow } from '../components/ui';
+import { apiGet, formatINR, type AdminBranch, type AdminStats } from '../lib/api';
 
-type Tab = 'overview' | 'customers' | 'transactions' | 'loans' | 'notices';
+type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'loans' | 'notices';
 
 export function OverviewSection({
   stats,
@@ -15,6 +15,12 @@ export function OverviewSection({
   error: string | null;
   onNavigate: (tab: Tab, preset?: { status?: string; type?: string }) => void;
 }) {
+  const [branches, setBranches] = useState<AdminBranch[] | null>(null);
+
+  useEffect(() => {
+    apiGet<{ branches: AdminBranch[] }>('/admin/branches').then((res) => setBranches(res.data?.branches ?? []));
+  }, [stats]);
+
   if (error) return <FlashMessage flash={{ kind: 'error', text: error }} />;
   if (!stats) return <div className="p-6 text-center text-slate-600">Loading bank overview...</div>;
 
@@ -22,7 +28,12 @@ export function OverviewSection({
     <div className="space-y-3">
       <Panel title="🏛️ Bank at a Glance" tone="admin">
         <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-          <StatTile label="Customers" value={stats.customer_count} onClick={() => onNavigate('customers')} />
+          <StatTile
+            label="Open accounts"
+            value={stats.customer_count}
+            hint={`across ${stats.branch_count} branches`}
+            onClick={() => onNavigate('customers')}
+          />
           <StatTile label="Total deposits" value={formatINR(stats.total_deposits)} hint="Sum of all balances" tone="good" />
           <StatTile
             label="Frozen accounts"
@@ -35,7 +46,14 @@ export function OverviewSection({
       </Panel>
 
       <Panel title="⏳ Pending Items" tone="admin">
-        <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+          <StatTile
+            label="Account applications"
+            value={stats.pending_applications}
+            hint="Click to approve or reject"
+            tone={stats.pending_applications ? 'warn' : 'default'}
+            onClick={() => onNavigate('applications')}
+          />
           <StatTile
             label="Withdrawals awaiting approval"
             value={stats.pending_withdrawals}
@@ -51,6 +69,45 @@ export function OverviewSection({
             onClick={() => onNavigate('loans')}
           />
         </div>
+      </Panel>
+
+      <Panel title="🏢 Branches & IFSC Codes" tone="admin">
+        <div className="overflow-x-auto">
+          <table className="bank-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Branch</th>
+                <th>IFSC</th>
+                <th className="text-right">Open accounts</th>
+                <th className="text-right">Pending applications</th>
+                <th className="text-right">Deposits</th>
+              </tr>
+            </thead>
+            <tbody>
+              {branches === null ? (
+                <LoadingRow colSpan={6} />
+              ) : (
+                branches.map((b) => (
+                  <tr key={b.code}>
+                    <td className="font-mono">{b.code}</td>
+                    <td>
+                      {b.name}, {b.city}
+                    </td>
+                    <td className="font-mono font-bold">{b.ifsc}</td>
+                    <td className="text-right">{b.open_accounts}</td>
+                    <td className="text-right">{b.pending_applications}</td>
+                    <td className="text-right font-mono">{formatINR(b.deposits)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className="m-0 px-3 py-2 text-[10.5px] text-slate-500 border-t border-[#ccd9e8]">
+          IFSC = bank code BNBK + 0 + branch code padded to 6. Account number = branch (4) + product (2: 10 savings,
+          20 current) + sequence (5) + Luhn check digit (1).
+        </p>
       </Panel>
 
       <Panel title="🤝 Loan Book" tone="admin">

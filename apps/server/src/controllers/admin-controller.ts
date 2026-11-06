@@ -9,6 +9,7 @@ import {
   noticeSchema,
   transactionFilterSchema,
   loanFilterSchema,
+  applicationFilterSchema,
 } from '../utils/validation.js';
 
 // Every handler runs behind authenticate + requireRole('admin'). The
@@ -28,7 +29,9 @@ export const adminController = {
   overview: async (_req: AuthenticatedRequest, res: Response) => {
     const [stats] = await query(
       `SELECT
-         (SELECT count(*)::int FROM users WHERE role = 'customer')                         AS customer_count,
+         (SELECT count(*)::int FROM accounts WHERE status IN ('ACTIVE', 'FROZEN'))         AS customer_count,
+         (SELECT count(*)::int FROM accounts WHERE status = 'PENDING')                     AS pending_applications,
+         (SELECT count(*)::int FROM branches)                                              AS branch_count,
          (SELECT coalesce(sum(balance), 0) FROM accounts)                                  AS total_deposits,
          (SELECT count(*)::int FROM accounts WHERE status = 'FROZEN')                      AS frozen_accounts,
          (SELECT count(*)::int FROM transactions
@@ -45,9 +48,58 @@ export const adminController = {
     return res.json({ stats });
   },
 
+  // Opened accounts only; applications are listed by `applications`.
   customers: async (_req: AuthenticatedRequest, res: Response) => {
-    const rows = await query(`SELECT * FROM v_customer_overview ORDER BY name`);
+    const rows = await query(
+      `SELECT * FROM v_customer_overview WHERE account_status IN ('ACTIVE', 'FROZEN') ORDER BY name`
+    );
     return res.json({ customers: rows });
+  },
+
+  applications: async (req: AuthenticatedRequest, res: Response) => {
+    const f = parseOr400(applicationFilterSchema, req.query, res);
+    if (!f) return;
+    const rows = await query(
+      `SELECT * FROM v_customer_overview
+       WHERE $1::account_status IS NULL OR account_status = $1::account_status
+       ORDER BY (account_status = 'PENDING') DESC, applied_at DESC`,
+      [f.status ?? null]
+    );
+    return res.json({ applications: rows });
+  },
+
+  approveAccount: async (req: AuthenticatedRequest, res: Response) => {
+    const row = await callAs<{ p_account_number: string }>(
+      adminId(req),
+      'CALL sp_approve_account($1, $2::uuid, NULL)',
+      [adminId(req), req.params.id]
+    );
+    return res.json({ status: 'ACTIVE', accountNumber: row.p_account_number });
+  },
+
+  rejectAccount: async (req: AuthenticatedRequest, res: Response) => {
+    const body = parseOr400(reasonSchema, req.body, res);
+    if (!body) return;
+    await callAs(adminId(req), 'CALL sp_reject_account($1, $2::uuid, $3)', [
+      adminId(req),
+      req.params.id,
+      body.reason ?? null,
+    ]);
+    return res.json({ status: 'REJECTED' });
+  },
+
+  branches: async (_req: AuthenticatedRequest, res: Response) => {
+    const rows = await query(
+      `SELECT b.code, b.name, b.city, b.ifsc,
+              count(a.id) FILTER (WHERE a.status IN ('ACTIVE', 'FROZEN'))::int AS open_accounts,
+              count(a.id) FILTER (WHERE a.status = 'PENDING')::int AS pending_applications,
+              coalesce(sum(a.balance), 0) AS deposits
+       FROM branches b
+       LEFT JOIN accounts a ON a.branch_code = b.code
+       GROUP BY b.code
+       ORDER BY b.code`
+    );
+    return res.json({ branches: rows });
   },
 
   setAccountStatus: async (req: AuthenticatedRequest, res: Response) => {
@@ -69,7 +121,8 @@ export const adminController = {
        WHERE ($1::text IS NULL
               OR customer_name ILIKE '%' || $1 || '%'
               OR customer_email ILIKE '%' || $1 || '%'
-              OR account_number LIKE $1 || '%')
+              OR account_number LIKE $1 || '%'
+              OR counterparty_account_number LIKE $1 || '%')
          AND ($2::txn_type IS NULL OR type = $2::txn_type)
          AND ($3::txn_status IS NULL OR status = $3::txn_status)
          AND ($4::date IS NULL OR created_at >= $4::date)

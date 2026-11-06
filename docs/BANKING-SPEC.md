@@ -12,22 +12,48 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 | Driver | `pg` (node-postgres), which works with both Neon and local Postgres. |
 | Backend | Express in `apps/server` is the only backend. Next.js rewrites `/api/*` to it. The in-memory Next.js auth route and `lib/server-auth.ts` are deleted. |
 | Branding | Fictional **Bharat National Bank**, keeping the existing retro netbanking look. No SBI names, IFSC codes or logos. |
-| Old mock features | Removed: fund transfer, beneficiaries, FDs, cheque books, fake CBS terminal, localStorage banking data. |
+| Old mock features | Removed: beneficiaries, FDs, cheque books, fake CBS terminal, localStorage banking data. Fund transfer is back as a real, in-database feature (§3). |
 
 ## 2. Roles and authentication
 
-- **Customer**: signs up at `/signup` and logs in at `/login`. Lands on `/dashboard`.
-- **Admin**: comes from the seed only (no signup). Logs in at `/admin/login` and lands on `/admin`.
-- Login endpoints are role-scoped: `POST /api/auth/login` rejects admins, and `POST /api/auth/admin/login` rejects customers.
+- **Customer**: applies at `/signup` (name, mobile, date of birth, address, home branch, account type, email, password) and logs in at `/login` with their email. Lands on `/dashboard`. Until an admin approves the application, the dashboard shows only the application status and notices.
+- **Admin**: comes from the seed only (no signup). The database gives every admin a staff **Admin ID** (`BNBA0001`, `BNBA0002`, ...) from `staff_id_seq` when the row is inserted; `db:setup` prints it. Admins log in at `/admin/login` with that Admin ID (email also works) and land on `/admin`. The seeded admin's email and password come from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+- Login endpoints are role-scoped: `POST /api/auth/login` rejects admins, and `POST /api/auth/admin/login` (body `{ adminId, password }`) rejects customers.
 - Middleware: `authenticate`, plus `requireRole('customer' | 'admin')` on every banking route.
 
 ## 3. Business rules
 
+### Branches and IFSC
+- The bank has branches (`branches` table, seeded: 0001 New Delhi, 0002 Mumbai, 0003 Bengaluru, 0004 Puducherry).
+- Each branch's IFSC is a generated column: bank code `BNBK` + `0` + branch code padded to 6, e.g. branch `0004` → `BNBK0000004`.
+
+### Account numbers
+12 digits, built from functional blocks:
+
+| Block | Digits | Source |
+|---|---|---|
+| Branch code | 4 | the applicant's home branch |
+| Product code | 2 | `10` savings, `20` current |
+| Sequence | 5 | `account_number_seq`, shared by all branches so numbers never repeat |
+| Check digit | 1 | Luhn (mod 10) over the first 11 digits |
+
+Example: `0001 10 00001 5`. CHECK constraints enforce the check digit and that the branch and product blocks match the account's own branch and type. The check digit catches every single-digit typo before a transfer.
+
+### Account opening and approval
+- Registering (`sp_register_customer`) creates the user and a `PENDING` account application with an application number. Applicants must be 18 or older.
+- An admin approves (`sp_approve_account`), which generates the account number and opens the account (`ACTIVE`, balance ₹0), or rejects it with a reason (`REJECTED`). Only `ACTIVE` and `FROZEN` accounts have a number.
+- No money moves through a `PENDING` or `REJECTED` account (`fn_lock_customer_account` and the frozen-account trigger refuse it).
+
 ### Accounts
-- Each customer has one savings account. A trigger creates it when the customer row is inserted.
-- The account starts with a generated 11-digit account number and a balance of ₹0.
+- Each customer has one account (savings or current).
 - `balance >= 0` is enforced by a CHECK constraint.
-- Status is `ACTIVE` or `FROZEN`. A frozen account cannot deposit, withdraw, request a loan or receive a disbursal. Paying dues is still allowed, so a freeze can't force a default.
+- An open account is `ACTIVE` or `FROZEN`. A frozen account cannot deposit, withdraw, transfer, receive transfers, request a loan or receive a disbursal. Paying dues is still allowed, so a freeze can't force a default.
+
+### Transfers
+- A customer sends money to another account of the bank by account number + IFSC.
+- They first verify the payee: the server checks the check digit and that the IFSC belongs to the payee's branch, and shows the masked holder name (`Priya S.`) and branch.
+- `sp_transfer` posts a `TRANSFER_OUT` debit and a `TRANSFER_IN` credit in one transaction, linked through `counterparty_account_id`. Both accounts are locked in id order to avoid deadlocks.
+- Transfers to your own account, to non-active accounts, or above the balance are refused. Transfers cannot be reversed.
 
 ### Deposits and withdrawals
 - Amounts must be > 0, with at most 2 decimal places.
@@ -37,7 +63,7 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 
 ### Admin transaction management
 - View and filter every transaction by customer, type, status and date range.
-- Reverse a `COMPLETED` deposit or withdrawal. This posts an opposite `REVERSAL` entry and marks the original `REVERSED`. Ledger rows are never updated in amount or deleted.
+- Reverse a `COMPLETED` deposit or withdrawal (not transfers or loan transactions). This posts an opposite `REVERSAL` entry and marks the original `REVERSED`. Ledger rows are never updated in amount or deleted.
   - Reversing a deposit fails if the balance is insufficient.
   - Loan-related transactions cannot be reversed.
 - Approve or reject pending withdrawals.
@@ -81,6 +107,7 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 ## 4. Database objects
 
 **Tables**
+- `branches`
 - `users`
 - `accounts`
 - `transactions`
@@ -91,8 +118,12 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 - `audit_log`
 
 **Procedures and functions**
+- `sp_register_customer`
+- `sp_approve_account`
+- `sp_reject_account`
 - `sp_deposit`
 - `sp_withdraw`
+- `sp_transfer`
 - `sp_approve_withdrawal`
 - `sp_reject_withdrawal`
 - `sp_reverse_transaction`
@@ -105,10 +136,12 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 - `sp_run_monthly_cycle`
 - `fn_credit_score`
 - `fn_suggested_rate`
+- `fn_generate_account_number`, `fn_luhn_check_digit`, `fn_is_valid_account_number`, `fn_is_valid_ifsc`
+- `fn_lookup_payee`, `fn_mask_name`
 
 **Triggers**
-- Auto-create an account when a customer is inserted.
-- Block transactions on frozen accounts.
+- Assign a staff Admin ID when an admin is inserted.
+- Block transactions on frozen and unopened accounts.
 - Maintain `updated_at`.
 - Write row-change audit entries for `accounts`, `loans` and `transactions` to `audit_log`.
 
@@ -116,21 +149,24 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 - `v_account_statement`: running balance per transaction.
 - `v_admin_transactions`: transactions joined with customer and account.
 - `v_loan_summary`: loan with current due and totals paid.
-- `v_customer_overview`: customer, account, balance, status, credit score and active loan.
+- `v_customer_overview`: customer KYC, branch and IFSC, account or application, balance, status, credit score and active loan.
 
 ## 5. Pages
 
 **Customer** (`/dashboard`)
-- Account summary
+- Application status (while pending or rejected)
+- Account summary with IFSC and branch
 - Deposit
 - Withdraw
+- Transfer (verify payee, then send)
 - Statement
 - Loans: request, current due, pay interest, repay principal, history
 - Credit score with its breakdown
 - Notices
 
 **Admin** (`/admin`)
-- Overview: customer count, total deposits, pending items
+- Overview: open accounts, total deposits, pending items, branches with IFSC codes
+- Applications: review KYC details, approve (generates the account number) or reject with a reason
 - Customers: freeze or unfreeze
 - Transactions: filter, reverse, approve or reject withdrawals
 - Loans: sanction with the suggested rate, reject, run monthly cycle
@@ -139,5 +175,5 @@ Agreed design for the DBMS lab bank management system. Extends [SPEC.md](./SPEC.
 ## 6. Setup
 
 1. Put `DATABASE_URL` and `JWT_SECRET` in `apps/server/.env`.
-2. Run `npm run db:setup --workspace=apps/server` to apply the SQL files in order and seed the admin account.
+2. Run `npm run db:setup --workspace=apps/server` to apply the SQL files in order and seed the admin (Admin ID `BNBA0001`) and demo customers: `demo@example.com` and `priya@example.com` (approved) and `ravi@example.com` (pending), all with password `password123`. A database from before branches/IFSC must be rebuilt with `-- --reset`.
 3. Run `npm run dev` to start the server and web app.

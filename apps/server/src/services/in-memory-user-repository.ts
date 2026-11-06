@@ -3,6 +3,7 @@ import type { IUserRepository, UserRecord, CreateUserData } from '../db/user-rep
 
 export class InMemoryUserRepository implements IUserRepository {
   private users: Map<string, UserRecord> = new Map();
+  private adminCount = 0;
 
   async findByEmail(email: string): Promise<UserRecord | null> {
     const normalizedEmail = email.toLowerCase().trim();
@@ -19,6 +20,16 @@ export class InMemoryUserRepository implements IUserRepository {
     return user ? { ...user } : null;
   }
 
+  async findByStaffId(staffId: string): Promise<UserRecord | null> {
+    const wanted = staffId.toUpperCase().trim();
+    for (const user of this.users.values()) {
+      if (user.staffId === wanted) {
+        return { ...user };
+      }
+    }
+    return null;
+  }
+
   async create(data: CreateUserData): Promise<UserRecord> {
     const now = new Date();
     const user: UserRecord = {
@@ -27,6 +38,7 @@ export class InMemoryUserRepository implements IUserRepository {
       email: data.email.toLowerCase().trim(),
       passwordHash: data.passwordHash,
       role: data.role || 'customer',
+      staffId: data.role === 'admin' ? `BNBA${String(++this.adminCount).padStart(4, '0')}` : null,
       createdAt: now,
       updatedAt: now,
     };
