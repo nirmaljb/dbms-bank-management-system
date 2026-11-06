@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Panel, FlashMessage, AmountInput, type Flash } from '../components/ui';
 import { apiGet, apiPost, formatAccountNumber, formatINR, toQuery, type CustomerOverview, type Payee } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 // Two steps, like a real NetBanking transfer: verify the payee (the server
 // checks the account number's check digit and that the IFSC matches its
@@ -88,34 +89,38 @@ export function TransferSection({ overview, onDone }: { overview: CustomerOvervi
           <form onSubmit={verify} className="space-y-3 pt-3 border-t border-slate-200" noValidate>
             {row(
               <label htmlFor="payeeAccount">Payee account number:</label>,
-              <input
-                id="payeeAccount"
-                className="bank-input w-full font-mono"
-                inputMode="numeric"
-                placeholder="12 digits"
-                value={accountNumber}
-                disabled={!!payee}
-                onChange={(e) => {
-                  setAccountNumber(e.target.value.replace(/[^\d ]/g, '').slice(0, 15));
-                  resetPayee();
-                }}
-              />
+              <WithKeyboard numeric disabled={!!payee}>
+                <input
+                  id="payeeAccount"
+                  className="bank-input w-full font-mono"
+                  inputMode="numeric"
+                  placeholder="12 digits"
+                  value={accountNumber}
+                  disabled={!!payee}
+                  onChange={(e) => {
+                    setAccountNumber(e.target.value.replace(/[^\d ]/g, '').slice(0, 15));
+                    resetPayee();
+                  }}
+                />
+              </WithKeyboard>
             )}
             {row(
               <label htmlFor="payeeIfsc">IFSC code:</label>,
-              <input
-                id="payeeIfsc"
-                className="bank-input w-full font-mono uppercase"
-                placeholder="e.g. BNBK0000001"
-                maxLength={11}
-                value={ifsc}
-                disabled={!!payee}
-                autoCapitalize="characters"
-                onChange={(e) => {
-                  setIfsc(e.target.value.toUpperCase());
-                  resetPayee();
-                }}
-              />
+              <WithKeyboard disabled={!!payee}>
+                <input
+                  id="payeeIfsc"
+                  className="bank-input w-full font-mono uppercase"
+                  placeholder="e.g. BNBK0000001"
+                  maxLength={11}
+                  value={ifsc}
+                  disabled={!!payee}
+                  autoCapitalize="characters"
+                  onChange={(e) => {
+                    setIfsc(e.target.value.toUpperCase());
+                    resetPayee();
+                  }}
+                />
+              </WithKeyboard>
             )}
             {!payee && (
               <div className="flex justify-end">
@@ -147,13 +152,15 @@ export function TransferSection({ overview, onDone }: { overview: CustomerOvervi
               )}
               {row(
                 <label htmlFor="remarks">Remarks (optional):</label>,
-                <input
-                  id="remarks"
-                  className="bank-input w-full"
-                  maxLength={100}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                />
+                <WithKeyboard>
+                  <input
+                    id="remarks"
+                    className="bank-input w-full"
+                    maxLength={100}
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                  />
+                </WithKeyboard>
               )}
               <div className="pt-3 border-t border-slate-200 flex justify-end">
                 <button type="submit" className="bank-btn px-6 disabled:opacity-50" disabled={busy || frozen}>

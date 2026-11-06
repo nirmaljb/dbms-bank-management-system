@@ -9,6 +9,7 @@ import { BankFooter } from '../components/BankFooter';
 import { CaptchaBox, useCaptcha } from '../components/CaptchaBox';
 import { RetroDialog } from '../components/RetroDialog';
 import { apiGet, type AccountType, type Branch } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 type Field =
   | 'name'
@@ -175,15 +176,29 @@ export default function SignupPage() {
   ) => (
     <div>
       {label(id, text)}
-      <input
-        id={id}
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        onChange={(e) => onChange(e.target.value)}
-        className="bank-input w-full"
-        {...extra}
-      />
+      {type === 'date' ? (
+        <input
+          id={id}
+          type={type}
+          value={value}
+          autoComplete={autoComplete}
+          onChange={(e) => onChange(e.target.value)}
+          className="bank-input w-full"
+          {...extra}
+        />
+      ) : (
+        <WithKeyboard numeric={extra.inputMode === 'numeric'}>
+          <input
+            id={id}
+            type={type}
+            value={value}
+            autoComplete={autoComplete}
+            onChange={(e) => onChange(e.target.value)}
+            className="bank-input w-full"
+            {...extra}
+          />
+        </WithKeyboard>
+      )}
       {error(id)}
     </div>
   );
@@ -226,14 +241,16 @@ export default function SignupPage() {
                   </div>
                   <div>
                     {label('address', 'Residential address')}
-                    <textarea
-                      id="address"
-                      rows={2}
-                      value={address}
-                      autoComplete="street-address"
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="bank-input w-full"
-                    />
+                    <WithKeyboard>
+                      <textarea
+                        id="address"
+                        rows={2}
+                        value={address}
+                        autoComplete="street-address"
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="bank-input w-full"
+                      />
+                    </WithKeyboard>
                     {error('address')}
                   </div>
                 </fieldset>
@@ -293,17 +310,19 @@ export default function SignupPage() {
                     Captcha
                   </label>
                   <CaptchaBox code={captcha.code} onRefresh={captcha.refresh} />
-                  <input
-                    id="captchaInput"
-                    type="text"
-                    value={captchaInput}
-                    onChange={(e) => setCaptchaInput(e.target.value)}
-                    placeholder="Type the code above"
-                    className="bank-input w-full mt-1.5 font-mono font-bold tracking-wider uppercase"
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    spellCheck={false}
-                  />
+                  <WithKeyboard className="mt-1.5">
+                    <input
+                      id="captchaInput"
+                      type="text"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      placeholder="Type the code above"
+                      className="bank-input w-full font-mono font-bold tracking-wider uppercase"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                    />
+                  </WithKeyboard>
                   {error('captcha')}
                 </div>
 

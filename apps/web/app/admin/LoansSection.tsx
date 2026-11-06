@@ -12,6 +12,7 @@ import {
   type Flash,
 } from '../components/ui';
 import { apiGet, apiPost, formatDate, formatINR, type LoanStatus, type LoanSummary } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 const STATUSES: LoanStatus[] = ['PENDING', 'ACTIVE', 'DEFAULTED', 'CLOSED', 'REJECTED'];
 
@@ -170,15 +171,19 @@ export function LoansSection({ onChange }: { onChange: () => void }) {
                     <td className="font-mono">
                       {l.status === 'PENDING' ? (
                         <div className="flex items-center gap-1">
-                          <input
-                            className="bank-input w-16 font-mono"
-                            placeholder={Number(l.suggested_rate).toFixed(2)}
-                            value={rates[l.loan_id] ?? ''}
-                            onChange={(e) =>
-                              setRates((r) => ({ ...r, [l.loan_id]: sanitizeAmount(e.target.value) }))
-                            }
-                            title="Leave blank to use the suggested rate"
-                          />
+                          <WithKeyboard numeric className="w-24">
+                            <input
+                              className="bank-input w-full font-mono"
+                              inputMode="decimal"
+                              placeholder={Number(l.suggested_rate).toFixed(2)}
+                              value={rates[l.loan_id] ?? ''}
+                              onChange={(e) =>
+                                setRates((r) => ({ ...r, [l.loan_id]: sanitizeAmount(e.target.value) }))
+                              }
+                              aria-label={`Interest rate for loan ${l.loan_id}`}
+                              title="Leave blank to use the suggested rate"
+                            />
+                          </WithKeyboard>
                           %
                         </div>
                       ) : l.interest_rate ? (

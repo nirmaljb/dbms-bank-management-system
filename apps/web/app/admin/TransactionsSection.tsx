@@ -21,6 +21,7 @@ import {
   type AdminTransaction,
   type TxnType,
 } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 interface Filters {
   customer: string;
@@ -91,12 +92,14 @@ export function TransactionsSection({
       >
         <label>
           <span className="block font-bold text-[#003366]">Customer</span>
-          <input
-            className="bank-input w-44"
-            placeholder="name, email or A/c no."
-            value={filters.customer}
-            onChange={set('customer')}
-          />
+          <WithKeyboard className="w-52">
+            <input
+              className="bank-input w-full"
+              placeholder="name, email or A/c no."
+              value={filters.customer}
+              onChange={set('customer')}
+            />
+          </WithKeyboard>
         </label>
         <label>
           <span className="block font-bold text-[#003366]">Type</span>

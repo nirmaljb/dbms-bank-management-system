@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/auth-context';
 import { RetroDialog } from './RetroDialog';
+import { AccessibilityBar } from './AccessibilityBar';
 
 export interface NavItem {
   id: string;
@@ -34,12 +35,7 @@ export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps
   return (
     <>
       <header className="w-full select-none">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-2 focus:text-xs"
-        >
-          Skip to main content
-        </a>
+        <AccessibilityBar />
 
         <div className="bank-header-main flex items-center justify-between gap-3">
           <Link href={homeHref} className="flex items-center gap-3">

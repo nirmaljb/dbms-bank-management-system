@@ -11,6 +11,7 @@ import {
   ACCOUNT_TYPE_LABELS,
   type CustomerOverview,
 } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 export function CustomersSection({ onChange }: { onChange: () => void }) {
   const [customers, setCustomers] = useState<CustomerOverview[] | null>(null);
@@ -65,12 +66,15 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
     >
       <div className="p-2.5 bg-[#f0f4f8] border-b border-[#ccd9e8]">
         <FlashMessage flash={flash} onClose={() => setFlash(null)} />
-        <input
-          className="bank-input w-full max-w-sm"
-          placeholder="Search by name, email, account number or IFSC"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <WithKeyboard className="max-w-sm">
+          <input
+            className="bank-input w-full"
+            placeholder="Search by name, email, account number or IFSC"
+            aria-label="Search customers"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </WithKeyboard>
       </div>
       <div className="overflow-x-auto">
         <table className="bank-table">

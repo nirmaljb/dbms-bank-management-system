@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Panel, FlashMessage, EmptyRow, LoadingRow, type Flash } from '../components/ui';
 import { apiGet, apiPost, formatDateTime, type AdminNotice, type CustomerOverview } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 export function NoticesSection() {
   const [notices, setNotices] = useState<AdminNotice[] | null>(null);
@@ -61,21 +62,25 @@ export function NoticesSection() {
             </label>
             <label className="block">
               <span className="block text-[11px] font-bold text-[#003366] mb-1">Title *</span>
-              <input
-                className="bank-input w-full"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={120}
-              />
+              <WithKeyboard>
+                <input
+                  className="bank-input w-full"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={120}
+                />
+              </WithKeyboard>
             </label>
             <label className="block">
               <span className="block text-[11px] font-bold text-[#003366] mb-1">Message *</span>
-              <textarea
-                className="bank-input w-full min-h-[120px]"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                maxLength={2000}
-              />
+              <WithKeyboard>
+                <textarea
+                  className="bank-input w-full min-h-[120px]"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  maxLength={2000}
+                />
+              </WithKeyboard>
             </label>
             <div className="flex justify-end">
               <button type="submit" className="bank-btn px-6 disabled:opacity-50" disabled={busy}>
