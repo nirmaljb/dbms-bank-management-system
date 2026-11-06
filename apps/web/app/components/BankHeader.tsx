@@ -103,9 +103,6 @@ export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps
               <Link href="/signup" className="bank-nav-tab">
                 Open an Account
               </Link>
-              <Link href="/admin/login" className="bank-nav-tab">
-                Admin Login
-              </Link>
             </>
           )}
         </nav>
