@@ -20,6 +20,7 @@ import {
   type LoanDue,
   type LoanSummary,
 } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
 
 export function LoansSection({ overview, onDone }: { overview: CustomerOverview; onDone: () => void }) {
   const [loans, setLoans] = useState<LoanSummary[] | null>(null);
@@ -217,13 +218,15 @@ export function LoansSection({ overview, onDone }: { overview: CustomerOverview;
                 </label>
                 <label className="block">
                   <span className="block text-[11px] font-bold text-[#003366] mb-1">Purpose *</span>
-                  <input
-                    className="bank-input w-full"
-                    value={reqPurpose}
-                    onChange={(e) => setReqPurpose(e.target.value)}
-                    maxLength={200}
-                    placeholder="e.g. Home repairs, education, medical"
-                  />
+                  <WithKeyboard>
+                    <input
+                      className="bank-input w-full"
+                      value={reqPurpose}
+                      onChange={(e) => setReqPurpose(e.target.value)}
+                      maxLength={200}
+                      placeholder="e.g. Home repairs, education, medical"
+                    />
+                  </WithKeyboard>
                 </label>
                 <div className="flex justify-end">
                   <button type="submit" className="bank-btn px-6 disabled:opacity-50" disabled={busy || frozen}>

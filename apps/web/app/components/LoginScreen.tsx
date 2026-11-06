@@ -7,6 +7,7 @@ import { useAuth } from '../context/auth-context';
 import { BankHeader } from './BankHeader';
 import { BankFooter } from './BankFooter';
 import { CaptchaBox, useCaptcha } from './CaptchaBox';
+import { WithKeyboard } from './WithKeyboard';
 
 // Customers sign in with their email, admins with the Admin ID the bank
 // issued them (seeded by db:setup; admins cannot register themselves).
@@ -121,19 +122,21 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
                   <label htmlFor="email" className="block text-xs font-bold text-[#003366] mb-0.5">
                     {isAdmin ? 'Admin ID' : 'Email'}
                   </label>
-                  <input
-                    id="email"
-                    name={isAdmin ? 'adminId' : 'email'}
-                    type={isAdmin ? 'text' : 'email'}
-                    autoComplete="username"
-                    placeholder={isAdmin ? 'e.g. BNBA0001' : undefined}
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
-                    }}
-                    className="bank-input w-full"
-                  />
+                  <WithKeyboard>
+                    <input
+                      id="email"
+                      name={isAdmin ? 'adminId' : 'email'}
+                      type={isAdmin ? 'text' : 'email'}
+                      autoComplete="username"
+                      placeholder={isAdmin ? 'e.g. BNBA0001' : undefined}
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                      }}
+                      className="bank-input w-full"
+                    />
+                  </WithKeyboard>
                   {fieldErrors.email && <p className="mt-0.5 text-[10.5px] text-red-700 font-bold">{fieldErrors.email}</p>}
                   {isAdmin && (
                     <p className="mt-0.5 text-[10.5px] text-slate-500">
@@ -146,18 +149,20 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
                   <label htmlFor="password" className="block text-xs font-bold text-[#003366] mb-0.5">
                     Password
                   </label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                    }}
-                    className="bank-input w-full"
-                  />
+                  <WithKeyboard>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                      }}
+                      className="bank-input w-full"
+                    />
+                  </WithKeyboard>
                   {fieldErrors.password && (
                     <p className="mt-0.5 text-[10.5px] text-red-700 font-bold">{fieldErrors.password}</p>
                   )}
@@ -168,21 +173,23 @@ export function LoginScreen({ mode }: { mode: 'customer' | 'admin' }) {
                     Captcha
                   </label>
                   <CaptchaBox code={captcha.code} onRefresh={captcha.refresh} />
-                  <input
-                    id="captchaInput"
-                    name="captchaInput"
-                    type="text"
-                    value={captchaInput}
-                    onChange={(e) => {
-                      setCaptchaInput(e.target.value);
-                      if (fieldErrors.captcha) setFieldErrors((prev) => ({ ...prev, captcha: undefined }));
-                    }}
-                    placeholder="Type the code above"
-                    className="bank-input w-full mt-1.5 font-mono font-bold tracking-wider uppercase"
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    spellCheck={false}
-                  />
+                  <WithKeyboard className="mt-1.5">
+                    <input
+                      id="captchaInput"
+                      name="captchaInput"
+                      type="text"
+                      value={captchaInput}
+                      onChange={(e) => {
+                        setCaptchaInput(e.target.value);
+                        if (fieldErrors.captcha) setFieldErrors((prev) => ({ ...prev, captcha: undefined }));
+                      }}
+                      placeholder="Type the code above"
+                      className="bank-input w-full font-mono font-bold tracking-wider uppercase"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                    />
+                  </WithKeyboard>
                   {fieldErrors.captcha && (
                     <p className="mt-0.5 text-[10.5px] text-red-700 font-bold">{fieldErrors.captcha}</p>
                   )}

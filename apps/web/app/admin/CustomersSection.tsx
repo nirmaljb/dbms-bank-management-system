@@ -11,12 +11,15 @@ import {
   ACCOUNT_TYPE_LABELS,
   type CustomerOverview,
 } from '../lib/api';
+import { WithKeyboard } from '../components/WithKeyboard';
+import { DEFAULT_PIN } from '../components/PinPrompt';
 
 export function CustomersSection({ onChange }: { onChange: () => void }) {
   const [customers, setCustomers] = useState<CustomerOverview[] | null>(null);
   const [search, setSearch] = useState('');
   const [flash, setFlash] = useState<Flash>(null);
   const [target, setTarget] = useState<CustomerOverview | null>(null);
+  const [pinTarget, setPinTarget] = useState<CustomerOverview | null>(null);
 
   const load = useCallback(async () => {
     const res = await apiGet<{ customers: CustomerOverview[] }>('/admin/customers');
@@ -47,6 +50,15 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
     onChange();
   };
 
+  const resetPin = async (c: CustomerOverview) => {
+    const res = await apiPost(`/admin/customers/${c.user_id}/reset-pin`);
+    if (res.error !== undefined) {
+      setFlash({ kind: 'error', text: res.error });
+      return;
+    }
+    setFlash({ kind: 'success', text: `${c.name}'s PIN is back to the default PIN ${DEFAULT_PIN} and is unlocked.` });
+  };
+
   const q = search.trim().toLowerCase();
   const visible = (customers ?? []).filter(
     (c) =>
@@ -65,12 +77,15 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
     >
       <div className="p-2.5 bg-[#f0f4f8] border-b border-[#ccd9e8]">
         <FlashMessage flash={flash} onClose={() => setFlash(null)} />
-        <input
-          className="bank-input w-full max-w-sm"
-          placeholder="Search by name, email, account number or IFSC"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <WithKeyboard className="max-w-sm">
+          <input
+            className="bank-input w-full"
+            placeholder="Search by name, email, account number or IFSC"
+            aria-label="Search customers"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </WithKeyboard>
       </div>
       <div className="overflow-x-auto">
         <table className="bank-table">
@@ -135,6 +150,9 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
                     >
                       {c.account_status === 'FROZEN' ? 'Unfreeze' : 'Freeze'}
                     </button>
+                    <button type="button" className="bank-btn-secondary mt-1 block whitespace-nowrap" onClick={() => setPinTarget(c)}>
+                      Reset PIN
+                    </button>
                   </td>
                 </tr>
               ))
@@ -159,6 +177,20 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
           if (c) toggle(c);
         }}
         onClose={() => setTarget(null)}
+      />
+
+      <PromptDialog
+        isOpen={!!pinTarget}
+        title="Reset Customer PIN"
+        message={`Reset the PIN of ${pinTarget?.name} (${pinTarget?.email}) to the default PIN ${DEFAULT_PIN}?\nUse this when the customer has forgotten their PIN or locked it. It also clears the lock.`}
+        confirmText="Reset PIN"
+        danger
+        onConfirm={() => {
+          const c = pinTarget;
+          setPinTarget(null);
+          if (c) resetPin(c);
+        }}
+        onClose={() => setPinTarget(null)}
       />
     </Panel>
   );

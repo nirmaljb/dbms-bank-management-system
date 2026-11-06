@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, SignupInput, fetchMe, loginUser, adminLoginUser, signupUser, logoutUser } from '../lib/auth';
+import { User, SignupInput, fetchMe, loginUser, adminLoginUser, signupUser, logoutUser, changeUserPin } from '../lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +10,7 @@ interface AuthContextType {
   adminLogin: (input: { adminId: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   signup: (input: SignupInput) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  changePin: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,13 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: res.error || 'Signup failed' };
   };
 
+  const changePin = async (currentPin: string, newPin: string) => {
+    const res = await changeUserPin(currentPin, newPin);
+    if (res.user) {
+      setUser(res.user);
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'Could not change the PIN' };
+  };
+
   const logout = async () => {
     await logoutUser();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, adminLogin, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, adminLogin, signup, logout, changePin }}>
       {children}
     </AuthContext.Provider>
   );

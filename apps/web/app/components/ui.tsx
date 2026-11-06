@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { WithKeyboard } from './WithKeyboard';
 
 // Small building blocks shared by the customer dashboard and admin console,
 // styled with the retro classes in globals.css.
@@ -156,19 +157,21 @@ export function AmountInput({
   placeholder?: string;
 }) {
   return (
-    <div className="flex items-center">
-      <span className="px-2 py-[3px] bg-[#eef2f6] border border-r-0 border-[#7f9db9] font-bold text-xs">₹</span>
-      <input
-        id={id}
-        type="text"
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(sanitizeAmount(e.target.value))}
-        placeholder={placeholder}
-        className="bank-input w-full font-mono"
-        autoComplete="off"
-      />
-    </div>
+    <WithKeyboard numeric>
+      <div className="flex items-center">
+        <span className="px-2 py-[3px] bg-[#eef2f6] border border-r-0 border-[#7f9db9] font-bold text-xs">₹</span>
+        <input
+          id={id}
+          type="text"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(sanitizeAmount(e.target.value))}
+          placeholder={placeholder}
+          className="bank-input w-full font-mono"
+          autoComplete="off"
+        />
+      </div>
+    </WithKeyboard>
   );
 }
 
@@ -227,13 +230,15 @@ export function PromptDialog({
             {inputLabel && (
               <label className="block">
                 <span className="block font-bold text-[#003366] mb-1">{inputLabel}</span>
-                <input
-                  autoFocus
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  maxLength={300}
-                  className="bank-input w-full"
-                />
+                <WithKeyboard>
+                  <input
+                    autoFocus
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    maxLength={300}
+                    className="bank-input w-full"
+                  />
+                </WithKeyboard>
               </label>
             )}
           </div>

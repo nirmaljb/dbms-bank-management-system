@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/auth-context';
 import { RetroDialog } from './RetroDialog';
+import { AccessibilityBar } from './AccessibilityBar';
+import { ChangePinDialog, DEFAULT_PIN } from './PinPrompt';
 
 export interface NavItem {
   id: string;
@@ -22,6 +24,8 @@ export const BANK_NAME = 'Bharat National Bank';
 export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps) {
   const { user, logout } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showChangePin, setShowChangePin] = useState(false);
+  const [pinChanged, setPinChanged] = useState(false);
 
   const handleLogoutConfirm = async () => {
     const wasAdmin = user?.role === 'admin';
@@ -34,12 +38,7 @@ export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps
   return (
     <>
       <header className="w-full select-none">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-2 focus:text-xs"
-        >
-          Skip to main content
-        </a>
+        <AccessibilityBar />
 
         <div className="bank-header-main flex items-center justify-between gap-3">
           <Link href={homeHref} className="flex items-center gap-3">
@@ -60,6 +59,13 @@ export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps
                   {user.role === 'admin' ? `Administrator · ${user.staffId ?? ''}` : 'Customer'}
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowChangePin(true)}
+                className="bank-btn-secondary text-xs px-2.5 py-1"
+              >
+                🔑 Change PIN
+              </button>
               <button
                 type="button"
                 onClick={() => setShowLogoutConfirm(true)}
@@ -103,13 +109,38 @@ export function BankHeader({ navItems, activeTab, onTabChange }: BankHeaderProps
               <Link href="/signup" className="bank-nav-tab">
                 Open an Account
               </Link>
-              <Link href="/admin/login" className="bank-nav-tab">
-                Admin Login
-              </Link>
             </>
           )}
         </nav>
+
+        {user?.pinIsDefault && (
+          <div className="px-3 py-1.5 bg-[#fff8e6] border-b-2 border-[#f0c86e] text-[#8a5a00] text-[11px] font-semibold flex flex-wrap items-center gap-2">
+            <span>
+              🔒 Every action asks for your PIN. You are still using the default PIN{' '}
+              <b className="font-mono">{DEFAULT_PIN}</b>. Set your own PIN to keep your account safe.
+            </span>
+            <button type="button" onClick={() => setShowChangePin(true)} className="bank-btn text-[11px] px-2.5 py-0.5">
+              Set my PIN
+            </button>
+          </div>
+        )}
+        {pinChanged && !user?.pinIsDefault && (
+          <div className="px-3 py-1.5 bg-[#effaef] border-b-2 border-[#2e8b2e] text-[#004d00] text-[11px] font-semibold flex items-center gap-2">
+            <span className="flex-1">✅ Your PIN has been changed. Use the new PIN for every action from now on.</span>
+            <button type="button" onClick={() => setPinChanged(false)} className="text-[10px] underline bg-transparent border-0 cursor-pointer">
+              dismiss
+            </button>
+          </div>
+        )}
       </header>
+
+      <ChangePinDialog
+        isOpen={showChangePin}
+        onClose={(changed) => {
+          setShowChangePin(false);
+          if (changed) setPinChanged(true);
+        }}
+      />
 
       <RetroDialog
         isOpen={showLogoutConfirm}

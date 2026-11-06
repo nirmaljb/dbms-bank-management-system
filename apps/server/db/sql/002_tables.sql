@@ -112,6 +112,14 @@ CREATE TABLE IF NOT EXISTS users (
   CONSTRAINT users_staff_id_for_admins CHECK ((role = 'admin') = (staff_id IS NOT NULL))
 );
 
+-- Transaction PIN, asked before every action (deposit, transfer, approval,
+-- ...). A NULL pin_hash means the user still has the default PIN. Three wrong
+-- PINs in a row lock it until pin_locked_until. Added with ALTER so existing
+-- databases pick the columns up without a reset.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_failed_attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_locked_until timestamptz;
+
 -- One account per customer. It starts PENDING with no number; an admin
 -- approves it (sp_approve_account), which assigns the number and opens it.
 CREATE TABLE IF NOT EXISTS accounts (

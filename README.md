@@ -26,6 +26,7 @@ All banking rules live **in PostgreSQL** as stored procedures, triggers, functio
    ```
    This applies every SQL file and seeds test users (password `password123` for all):
    - admin: Admin ID `BNBA0001` / `admin@example.com` (override the email and password with `ADMIN_EMAIL` / `ADMIN_PASSWORD`). Admins never register on the site; the database issues each one an Admin ID and setup prints it.
+   - every user starts with the transaction PIN `1234`, asked before every action; change it from **Change PIN** in the header. An admin can reset a customer's forgotten or locked PIN from the Customers tab.
    - customers: `demo@example.com` and `priya@example.com` (approved accounts), `ravi@example.com` (application waiting for approval). Skip them with `npm run db:setup --workspace=apps/server -- --no-demo`
 
    Setup is idempotent. To wipe and rebuild (for example, a database created by the old Drizzle schema):

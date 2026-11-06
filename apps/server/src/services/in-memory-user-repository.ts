@@ -39,10 +39,34 @@ export class InMemoryUserRepository implements IUserRepository {
       passwordHash: data.passwordHash,
       role: data.role || 'customer',
       staffId: data.role === 'admin' ? `BNBA${String(++this.adminCount).padStart(4, '0')}` : null,
+      pinHash: null,
+      pinFailedAttempts: 0,
+      pinLockedUntil: null,
       createdAt: now,
       updatedAt: now,
     };
     this.users.set(user.id, user);
     return { ...user };
+  }
+
+  async setPinHash(id: string, pinHash: string | null): Promise<void> {
+    const user = this.users.get(id);
+    if (user) Object.assign(user, { pinHash, pinFailedAttempts: 0, pinLockedUntil: null });
+  }
+
+  async recordPinFailure(id: string, maxAttempts: number, lockMinutes: number) {
+    const user = this.users.get(id)!;
+    user.pinFailedAttempts += 1;
+    if (user.pinFailedAttempts >= maxAttempts) {
+      user.pinFailedAttempts = 0;
+      user.pinLockedUntil = new Date(Date.now() + lockMinutes * 60_000);
+      return { attemptsLeft: 0, lockedUntil: user.pinLockedUntil };
+    }
+    return { attemptsLeft: maxAttempts - user.pinFailedAttempts, lockedUntil: user.pinLockedUntil };
+  }
+
+  async clearPinFailures(id: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) Object.assign(user, { pinFailedAttempts: 0, pinLockedUntil: null });
   }
 }

@@ -6,6 +6,7 @@ One-page reference for the Bharat National Bank backend. Business rules live in 
 **Auth:** JWT in HTTP-only cookie `token`. 🔓 public · 👤 customer · 🛡 admin.
 **Errors:** `{ "error": "<message>" }` — 400 validation / rule, 401 no session, 403 wrong role, 404 not found, 409 duplicate.
 **Amounts** are sent as strings (`"1500.00"`) to avoid float loss.
+**PIN** 🔒: every action (each POST marked 🔒) needs the user's 4-digit PIN in the `X-Transaction-Pin` header. Everyone starts with the default PIN `1234` (`DEFAULT_PIN`) until they set their own. Missing PIN → `428 { code: "PIN_REQUIRED" }`; wrong → `403 { code: "PIN_INVALID" }`; 3 wrong in a row lock it for 15 min → `423 { code: "PIN_LOCKED" }`. The web client asks for the PIN and resends on 428/403.
 
 ---
 
@@ -19,7 +20,8 @@ One-page reference for the Bharat National Bank backend. Business rules live in 
 | POST | `/login` | 🔓 | `email, password` (customers only) | `{ user }` + cookie |
 | POST | `/admin/login` | 🔓 | `adminId (BNBA0001 or email), password` (admins only) | `{ user }` + cookie |
 | POST | `/logout` | 🔓 | — | `{ message }`, clears cookie |
-| GET | `/me` | any signed-in | — | `{ user }` |
+| GET | `/me` | any signed-in | — | `{ user }` (`pinIsDefault` true until the PIN is changed) |
+| POST | `/pin` | any signed-in | `currentPin, newPin` (4 digits, not the default) | `{ user }` |
 
 ### Public
 
@@ -33,16 +35,16 @@ One-page reference for the Bharat National Bank backend. Business rules live in 
 | Method | Path | Body / Query | Returns | DB call |
 |---|---|---|---|---|
 | GET | `/overview` | — | `{ account }` (+ `withdrawal_approval_limit`, `unread_notices`) | `v_customer_overview` |
-| POST | `/deposit` | `amount` | `201 { txnId, status }` | `sp_deposit` |
-| POST | `/withdraw` | `amount` | `201 { txnId, status }` — `PENDING` if > ₹50,000 | `sp_withdraw` |
+| POST 🔒 | `/deposit` | `amount` | `201 { txnId, status }` | `sp_deposit` |
+| POST 🔒 | `/withdraw` | `amount` | `201 { txnId, status }` — `PENDING` if > ₹50,000 | `sp_withdraw` |
 | GET | `/payee` | `?accountNumber&ifsc` | `{ payee }` (masked name, branch) | `fn_lookup_payee` |
-| POST | `/transfer` | `accountNumber, ifsc, amount, remarks?` | `201 { txnId, status }` | `sp_transfer` |
+| POST 🔒 | `/transfer` | `accountNumber, ifsc, amount, remarks?` | `201 { txnId, status }` | `sp_transfer` |
 | GET | `/statement` | `?from&to` (YYYY-MM-DD) | `{ transactions }` | `v_account_statement` |
 | GET | `/loans` | — | `{ loans }` | `v_loan_summary` |
-| POST | `/loans` | `amount, purpose` | `201 { loanId }` | `sp_request_loan` |
+| POST 🔒 | `/loans` | `amount, purpose` | `201 { loanId }` | `sp_request_loan` |
 | GET | `/loans/:id/dues` | — | `{ dues }` | `loan_dues` |
-| POST | `/loans/:id/pay-interest` | — | `201 { txnId }` | `sp_pay_interest` |
-| POST | `/loans/:id/repay` | `amount` | `201 { txnId }` | `sp_repay_principal` |
+| POST 🔒 | `/loans/:id/pay-interest` | — | `201 { txnId }` | `sp_pay_interest` |
+| POST 🔒 | `/loans/:id/repay` | `amount` | `201 { txnId }` | `sp_repay_principal` |
 | GET | `/credit-score` | — | `{ score, suggestedRate, breakdown }` | `fn_credit_score*` |
 | GET | `/notices` | — | `{ notices, unreadCount }` | `notices` |
 | POST | `/notices/:id/read` | — | `{ readAt }` | `notice_reads` |
@@ -54,20 +56,21 @@ One-page reference for the Bharat National Bank backend. Business rules live in 
 | GET | `/overview` | — | `{ stats }` (counts and totals) | aggregates |
 | GET | `/branches` | — | `{ branches }` with open/pending counts, deposits | `branches` ⨝ `accounts` |
 | GET | `/applications` | `?status` (account_status) | `{ applications }` | `v_customer_overview` |
-| POST | `/applications/:id/approve` | — | `{ status, accountNumber }` | `sp_approve_account` |
-| POST | `/applications/:id/reject` | `reason?` | `{ status }` | `sp_reject_account` |
+| POST 🔒 | `/applications/:id/approve` | — | `{ status, accountNumber }` | `sp_approve_account` |
+| POST 🔒 | `/applications/:id/reject` | `reason?` | `{ status }` | `sp_reject_account` |
 | GET | `/customers` | — | `{ customers }` (ACTIVE / FROZEN) | `v_customer_overview` |
-| POST | `/accounts/:id/status` | `status (ACTIVE\|FROZEN)` | `{ status }` | `sp_set_account_status` |
+| POST 🔒 | `/accounts/:id/status` | `status (ACTIVE\|FROZEN)` | `{ status }` | `sp_set_account_status` |
+| POST 🔒 | `/customers/:userId/reset-pin` | — | `{ name }` — PIN back to default, lock cleared | `users` |
 | GET | `/transactions` | `?customer&type&status&from&to` (max 500 rows) | `{ transactions }` | `v_admin_transactions` |
-| POST | `/transactions/:id/approve` | — | `{ status }` | `sp_approve_withdrawal` |
-| POST | `/transactions/:id/reject` | `reason?` | `{ status }` | `sp_reject_withdrawal` |
-| POST | `/transactions/:id/reverse` | `reason?` | `201 { reversalTxnId }` | `sp_reverse_transaction` |
+| POST 🔒 | `/transactions/:id/approve` | — | `{ status }` | `sp_approve_withdrawal` |
+| POST 🔒 | `/transactions/:id/reject` | `reason?` | `{ status }` | `sp_reject_withdrawal` |
+| POST 🔒 | `/transactions/:id/reverse` | `reason?` | `201 { reversalTxnId }` | `sp_reverse_transaction` |
 | GET | `/loans` | `?status` (loan_status) | `{ loans }` + current score, suggested rate | `v_loan_summary` |
-| POST | `/loans/:id/sanction` | `rate?` (defaults to suggested) | `{ status, disbursalTxnId }` | `sp_sanction_loan` |
-| POST | `/loans/:id/reject` | `reason?` | `{ status }` | `sp_reject_loan` |
-| POST | `/monthly-cycle` | — | `{ loansProcessed, duesCreated, duesMissed, loansDefaulted }` | `sp_run_monthly_cycle` |
+| POST 🔒 | `/loans/:id/sanction` | `rate?` (defaults to suggested) | `{ status, disbursalTxnId }` | `sp_sanction_loan` |
+| POST 🔒 | `/loans/:id/reject` | `reason?` | `{ status }` | `sp_reject_loan` |
+| POST 🔒 | `/monthly-cycle` | — | `{ loansProcessed, duesCreated, duesMissed, loansDefaulted }` | `sp_run_monthly_cycle` |
 | GET | `/notices` | — | `{ notices }` with read counts | `notices` |
-| POST | `/notices` | `title, body, recipientUserId?` (null = broadcast) | `201 { noticeId }` | `notices` |
+| POST 🔒 | `/notices` | `title, body, recipientUserId?` (null = broadcast) | `201 { noticeId }` | `notices` |
 
 ---
 
