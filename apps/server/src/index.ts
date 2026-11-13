@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { createApp } from './app.js';
+import { createApp } from './create-app.js';
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is not set. Add it to apps/server/.env, then run npm run db:setup.');

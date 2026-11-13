@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { createApp } from '../app.js';
+import { createApp } from '../create-app.js';
 import { InMemoryUserRepository } from '../services/in-memory-user-repository.js';
 import { createRequirePin } from '../middleware/pin.js';
 import { authenticate } from '../middleware/auth.js';

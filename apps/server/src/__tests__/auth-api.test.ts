@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../app.js';
+import { createApp } from '../create-app.js';
 import { InMemoryUserRepository } from '../services/in-memory-user-repository.js';
 import { hashPassword } from '../utils/password.js';
 

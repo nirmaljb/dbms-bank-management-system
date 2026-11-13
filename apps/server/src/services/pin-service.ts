@@ -14,7 +14,8 @@ const lockedMessage = (until: Date) =>
   `Too many wrong PINs. Your PIN is locked until ${until.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: process.env.TZ || 'Asia/Kolkata',
+    // Not process.env.TZ: serverless hosts set it to values like ":UTC" that Intl rejects.
+    timeZone: 'Asia/Kolkata',
   })}.`;
 
 /** Checks `pin` against the user's PIN (or the default one) and counts wrong attempts. */
