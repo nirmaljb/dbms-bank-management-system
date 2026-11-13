@@ -1,4 +1,15 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]
+  "compilerOptions": {
+    // Vercel copies dist/*.js into /var/task without this package's
+    // "type": "module", so Node loads index.js as CommonJS and ESM output
+    // fails on its first import. Emit CommonJS; scripts/mark-cjs.mjs writes
+    // dist/package.json so `npm start` also loads it as CommonJS.
+    "module": "CommonJS",
+    "moduleResolution": "bundler",
+    "declaration": false,
+    "declarationMap": false
+  },
+  // setup.ts uses import.meta and runs through tsx (npm run db:setup).
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/db/setup.ts"]
 }
