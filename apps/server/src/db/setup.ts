@@ -78,18 +78,23 @@ async function main() {
 }
 
 // Databases built before branches, IFSC and account approval have an
-// accounts table without branch_code. CREATE TABLE IF NOT EXISTS would skip
-// it silently, so stop and ask for a reset instead.
+// accounts table without branch_code, and a users table without staff_id or
+// the KYC columns. CREATE TABLE IF NOT EXISTS would skip them silently, so
+// stop and ask for a reset instead.
 async function assertCurrentSchema(client: pg.Client) {
   const { rows } = await client.query(
     `SELECT
        to_regclass('public.accounts') IS NOT NULL AS has_accounts,
        EXISTS (SELECT 1 FROM information_schema.columns
-               WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'branch_code') AS has_branch`
+               WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'branch_code') AS has_branch,
+       to_regclass('public.users') IS NOT NULL AS has_users,
+       (SELECT count(*) FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users'
+          AND column_name IN ('staff_id', 'phone', 'date_of_birth', 'address')) = 4 AS has_kyc`
   );
-  if (rows[0].has_accounts && !rows[0].has_branch) {
+  if ((rows[0].has_accounts && !rows[0].has_branch) || (rows[0].has_users && !rows[0].has_kyc)) {
     throw new Error(
-      'This database uses the old account schema (11-digit numbers, no branches). ' +
+      'This database uses an old schema (no branches, Admin IDs or customer KYC details). ' +
         'Re-run with -- --reset to rebuild it.'
     );
   }
