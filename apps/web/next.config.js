@@ -1,7 +1,11 @@
 /* global process */
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Vercel's Next adapter packages the build itself and does not write the
+  // server trace that the standalone step copies, so standalone output fails
+  // there with ENOENT on .next/next-server.js.nft.json. Keep it for
+  // self-hosted builds only.
+  output: process.env.VERCEL ? undefined : 'standalone',
   // The Express server in apps/server is the only backend. Proxying /api
   // through Next keeps the auth cookie same-origin. On Vercel, vercel.json
   // routes /api to the server service before it reaches Next, so this
