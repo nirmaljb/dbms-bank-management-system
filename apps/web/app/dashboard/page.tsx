@@ -9,7 +9,6 @@ import { FlashMessage } from '../components/ui';
 import { apiGet, type CustomerOverview } from '../lib/api';
 import { SummarySection } from './SummarySection';
 import { DepositSection } from './DepositSection';
-import { WithdrawSection } from './WithdrawSection';
 import { StatementSection } from './StatementSection';
 import { LoansSection } from './LoansSection';
 import { CreditSection } from './CreditSection';
@@ -17,7 +16,7 @@ import { NoticesSection } from './NoticesSection';
 import { TransferSection } from './TransferSection';
 import { ApplicationStatus } from './ApplicationStatus';
 
-type Tab = 'summary' | 'deposit' | 'withdraw' | 'transfer' | 'statement' | 'loans' | 'credit' | 'notices';
+type Tab = 'summary' | 'deposit' | 'transfer' | 'statement' | 'loans' | 'credit' | 'notices';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -56,7 +55,6 @@ export default function DashboardPage() {
       ? [
           { id: 'summary', label: '📋 Account Summary' },
           { id: 'deposit', label: '💵 Deposit' },
-          { id: 'withdraw', label: '🏧 Withdraw' },
           { id: 'transfer', label: '🔁 Transfer' },
           { id: 'statement', label: '📜 Statement' },
           { id: 'loans', label: '🤝 Loans' },
@@ -100,7 +98,6 @@ export default function DashboardPage() {
           <>
             {tab === 'summary' && <SummarySection overview={overview} onNavigate={(t) => setTab(t as Tab)} />}
             {tab === 'deposit' && <DepositSection overview={overview} onDone={refresh} />}
-            {tab === 'withdraw' && <WithdrawSection overview={overview} onDone={refresh} />}
             {tab === 'transfer' && <TransferSection overview={overview} onDone={refresh} />}
             {tab === 'statement' && <StatementSection overview={overview} />}
             {tab === 'loans' && <LoansSection overview={overview} onDone={refresh} />}

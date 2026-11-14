@@ -66,9 +66,6 @@ export function SummarySection({
             <button type="button" className="bank-btn" onClick={() => onNavigate('deposit')}>
               Deposit
             </button>
-            <button type="button" className="bank-btn" onClick={() => onNavigate('withdraw')}>
-              Withdraw
-            </button>
             <button type="button" className="bank-btn" onClick={() => onNavigate('transfer')}>
               Transfer
             </button>
