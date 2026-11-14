@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRefreshOn } from '../lib/use-live-refresh';
 import { Panel, StatusBadge, FlashMessage, EmptyRow, LoadingRow, PromptDialog, type Flash } from '../components/ui';
 import {
   apiGet,
@@ -24,16 +25,17 @@ function ageOf(dob: string): number {
   return age;
 }
 
-export function ApplicationsSection({ onChange }: { onChange: () => void }) {
+export function ApplicationsSection({ onChange, version = 0 }: { onChange: () => void; version?: number }) {
   const [status, setStatus] = useState('PENDING');
   const [apps, setApps] = useState<CustomerOverview[] | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
   const [action, setAction] = useState<Action>(null);
 
-  const load = useCallback(async (s: string) => {
-    setApps(null);
+  const load = useCallback(async (s: string, quiet = false) => {
+    if (!quiet) setApps(null);
     const res = await apiGet<{ applications: CustomerOverview[] }>(`/admin/applications${toQuery({ status: s })}`);
     if (res.error !== undefined) {
+      if (quiet) return;
       setFlash({ kind: 'error', text: res.error });
       setApps([]);
     } else {
@@ -44,6 +46,8 @@ export function ApplicationsSection({ onChange }: { onChange: () => void }) {
   useEffect(() => {
     load(status);
   }, [load, status]);
+
+  useRefreshOn(version, () => load(status, true));
 
   const decide = async (a: NonNullable<Action>, reason?: string) => {
     const res = await apiPost<{ accountNumber?: string }>(

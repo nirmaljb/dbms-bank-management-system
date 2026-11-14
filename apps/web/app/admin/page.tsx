@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/auth-context';
 import { BankHeader, type NavItem } from '../components/BankHeader';
 import { BankFooter } from '../components/BankFooter';
 import { apiGet, type AdminStats } from '../lib/api';
+import { usePolling } from '../lib/use-live-refresh';
 import { OverviewSection } from './OverviewSection';
 import { CustomersSection } from './CustomersSection';
 import { TransactionsSection } from './TransactionsSection';
@@ -13,6 +14,9 @@ import { ChequesSection } from './ChequesSection';
 import { LoansSection } from './LoansSection';
 import { NoticesSection } from './NoticesSection';
 import { ApplicationsSection } from './ApplicationsSection';
+
+// How often the admin console asks the server whether anything changed.
+const POLL_MS = 10_000;
 
 type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'cheques' | 'loans' | 'notices';
 
@@ -31,19 +35,33 @@ export default function AdminPage() {
     else if (user.role !== 'admin') router.replace('/dashboard');
   }, [user, authLoading, router]);
 
-  const refreshStats = useCallback(async () => {
+  // Bumped whenever the overview numbers change, so the open section reloads
+  // its list quietly (new applications, withdrawals, cheques, loans...).
+  const [version, setVersion] = useState(0);
+  const lastStats = useRef<string | null>(null);
+
+  const refreshStats = useCallback(async (background = false) => {
     const res = await apiGet<{ stats: AdminStats }>('/admin/overview');
     if (res.error !== undefined) {
-      setStatsError(res.error);
-    } else {
-      setStatsError(null);
-      setStats(res.data.stats);
+      // A dropped poll shouldn't replace the overview with an error.
+      if (!background) setStatsError(res.error);
+      return;
     }
+    setStatsError(null);
+    const json = JSON.stringify(res.data.stats);
+    if (json === lastStats.current) return;
+    if (lastStats.current !== null) setVersion((v) => v + 1);
+    lastStats.current = json;
+    setStats(res.data.stats);
   }, []);
 
+  const isAdmin = user?.role === 'admin';
+
   useEffect(() => {
-    if (user?.role === 'admin') refreshStats();
-  }, [user, refreshStats]);
+    if (isAdmin) refreshStats();
+  }, [isAdmin, refreshStats]);
+
+  usePolling(() => refreshStats(true), POLL_MS, isAdmin);
 
   const navItems: NavItem[] = [
     { id: 'overview', label: '🏛️ Overview' },
@@ -76,11 +94,11 @@ export default function AdminPage() {
 
       <main id="main-content" className="p-3 sm:p-4 bg-[#f4f7fa] flex-1">
         {tab === 'overview' && <OverviewSection stats={stats} error={statsError} onNavigate={go} />}
-        {tab === 'applications' && <ApplicationsSection onChange={refreshStats} />}
-        {tab === 'customers' && <CustomersSection onChange={refreshStats} />}
-        {tab === 'transactions' && <TransactionsSection preset={txnPreset} onChange={refreshStats} />}
-        {tab === 'cheques' && <ChequesSection onChange={refreshStats} />}
-        {tab === 'loans' && <LoansSection onChange={refreshStats} />}
+        {tab === 'applications' && <ApplicationsSection version={version} onChange={refreshStats} />}
+        {tab === 'customers' && <CustomersSection version={version} onChange={refreshStats} />}
+        {tab === 'transactions' && <TransactionsSection preset={txnPreset} version={version} onChange={refreshStats} />}
+        {tab === 'cheques' && <ChequesSection version={version} onChange={refreshStats} />}
+        {tab === 'loans' && <LoansSection version={version} onChange={refreshStats} />}
         {tab === 'notices' && <NoticesSection />}
       </main>
 

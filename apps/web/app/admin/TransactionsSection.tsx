@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRefreshOn } from '../lib/use-live-refresh';
 import {
   Panel,
   StatusBadge,
@@ -38,19 +39,25 @@ type Action = { kind: 'approve' | 'reject' | 'reverse'; txn: AdminTransaction } 
 export function TransactionsSection({
   preset,
   onChange,
+  version = 0,
 }: {
   preset?: { status?: string; type?: string };
   onChange: () => void;
+  version?: number;
 }) {
   const [filters, setFilters] = useState<Filters>({ ...EMPTY, ...preset });
   const [rows, setRows] = useState<AdminTransaction[] | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
   const [action, setAction] = useState<Action>(null);
 
-  const load = useCallback(async (f: Filters) => {
-    setRows(null);
+  const applied = useRef<Filters>({ ...EMPTY, ...preset });
+
+  const load = useCallback(async (f: Filters, quiet = false) => {
+    applied.current = f;
+    if (!quiet) setRows(null);
     const res = await apiGet<{ transactions: AdminTransaction[] }>(`/admin/transactions${toQuery({ ...f })}`);
     if (res.error !== undefined) {
+      if (quiet) return;
       setFlash({ kind: 'error', text: res.error });
       setRows([]);
     } else {
@@ -61,6 +68,8 @@ export function TransactionsSection({
   useEffect(() => {
     load({ ...EMPTY, ...preset });
   }, [load, preset]);
+
+  useRefreshOn(version, () => load(applied.current, true));
 
   const run = async (a: NonNullable<Action>, reason: string) => {
     const id = a.txn.txn_id;

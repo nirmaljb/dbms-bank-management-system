@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRefreshOn } from '../lib/use-live-refresh';
 import { Panel, StatusBadge, FlashMessage, EmptyRow, LoadingRow, PromptDialog, type Flash } from '../components/ui';
 import {
   apiGet,
@@ -14,16 +15,17 @@ import {
 import { WithKeyboard } from '../components/WithKeyboard';
 import { DEFAULT_PIN } from '../components/PinPrompt';
 
-export function CustomersSection({ onChange }: { onChange: () => void }) {
+export function CustomersSection({ onChange, version = 0 }: { onChange: () => void; version?: number }) {
   const [customers, setCustomers] = useState<CustomerOverview[] | null>(null);
   const [search, setSearch] = useState('');
   const [flash, setFlash] = useState<Flash>(null);
   const [target, setTarget] = useState<CustomerOverview | null>(null);
   const [pinTarget, setPinTarget] = useState<CustomerOverview | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     const res = await apiGet<{ customers: CustomerOverview[] }>('/admin/customers');
     if (res.error !== undefined) {
+      if (quiet) return;
       setFlash({ kind: 'error', text: res.error });
       setCustomers([]);
     } else {
@@ -34,6 +36,8 @@ export function CustomersSection({ onChange }: { onChange: () => void }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useRefreshOn(version, () => load(true));
 
   const toggle = async (c: CustomerOverview) => {
     const status = c.account_status === 'FROZEN' ? 'ACTIVE' : 'FROZEN';

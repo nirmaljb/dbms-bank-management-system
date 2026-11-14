@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRefreshOn } from '../lib/use-live-refresh';
 import { Panel, StatusBadge, FlashMessage, EmptyRow, LoadingRow, PromptDialog, type Flash } from '../components/ui';
 import {
   apiGet,
@@ -18,17 +19,18 @@ type Action = { kind: 'clear' | 'return'; cheque: AdminCheque } | null;
 
 // The admin plays the clearing house. Clearing a cheque drawn on this bank
 // checks the drawer's balance at that moment and returns it unpaid if short.
-export function ChequesSection({ onChange }: { onChange: () => void }) {
+export function ChequesSection({ onChange, version = 0 }: { onChange: () => void; version?: number }) {
   const [status, setStatus] = useState('IN_CLEARING');
   const [rows, setRows] = useState<AdminCheque[] | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
   const [action, setAction] = useState<Action>(null);
   const [reason, setReason] = useState<ChequeReturnReason>('FUNDS_INSUFFICIENT');
 
-  const load = useCallback(async (s: string) => {
-    setRows(null);
+  const load = useCallback(async (s: string, quiet = false) => {
+    if (!quiet) setRows(null);
     const res = await apiGet<{ cheques: AdminCheque[] }>(`/admin/cheques${toQuery({ status: s })}`);
     if (res.error !== undefined) {
+      if (quiet) return;
       setFlash({ kind: 'error', text: res.error });
       setRows([]);
     } else {
@@ -39,6 +41,8 @@ export function ChequesSection({ onChange }: { onChange: () => void }) {
   useEffect(() => {
     load(status);
   }, [load, status]);
+
+  useRefreshOn(version, () => load(status, true));
 
   const run = async (a: NonNullable<Action>) => {
     const id = a.cheque.cheque_id;

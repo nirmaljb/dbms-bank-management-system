@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRefreshOn } from '../lib/use-live-refresh';
 import {
   Panel,
   StatusBadge,
@@ -16,7 +17,7 @@ import { WithKeyboard } from '../components/WithKeyboard';
 
 const STATUSES: LoanStatus[] = ['PENDING', 'ACTIVE', 'DEFAULTED', 'CLOSED', 'REJECTED'];
 
-export function LoansSection({ onChange }: { onChange: () => void }) {
+export function LoansSection({ onChange, version = 0 }: { onChange: () => void; version?: number }) {
   const [status, setStatus] = useState('');
   const [loans, setLoans] = useState<LoanSummary[] | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
@@ -25,10 +26,11 @@ export function LoansSection({ onChange }: { onChange: () => void }) {
   const [confirmCycle, setConfirmCycle] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async (s: string) => {
-    setLoans(null);
+  const load = useCallback(async (s: string, quiet = false) => {
+    if (!quiet) setLoans(null);
     const res = await apiGet<{ loans: LoanSummary[] }>(`/admin/loans${s ? `?status=${s}` : ''}`);
     if (res.error !== undefined) {
+      if (quiet) return;
       setFlash({ kind: 'error', text: res.error });
       setLoans([]);
     } else {
@@ -39,6 +41,8 @@ export function LoansSection({ onChange }: { onChange: () => void }) {
   useEffect(() => {
     load(status);
   }, [load, status]);
+
+  useRefreshOn(version, () => load(status, true));
 
   const afterAction = async (text: string) => {
     setFlash({ kind: 'success', text });
