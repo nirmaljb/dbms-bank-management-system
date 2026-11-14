@@ -55,9 +55,27 @@ Example: `0001 10 00001 5`. CHECK constraints enforce the check digit and that t
 - `sp_transfer` posts a `TRANSFER_OUT` debit and a `TRANSFER_IN` credit in one transaction, linked through `counterparty_account_id`. Both accounts are locked in id order to avoid deadlocks.
 - Transfers to your own account, to non-active accounts, or above the balance are refused. Transfers cannot be reversed.
 
-### Deposits and withdrawals
+### Deposits
+A customer cannot type in an amount and have it appear. Money comes in the two ways a real account receives it from outside the bank.
+
+**Cheque deposit** (`cheque_deposits`)
+- The customer enters the cheque number (6 digits), the date on the cheque, the amount, and the drawer's account number + IFSC.
+- A cheque is valid for 3 months from its date (`fn_cheque_validity`). Stale and post-dated cheques are refused.
+- A cheque drawn on this bank (IFSC `BNBK…`) is validated like a payee (check digit, IFSC of the account's branch) and cannot be drawn on the depositor's own account. Other banks' account numbers must be 9–18 digits.
+- The same cheque (IFSC + account + cheque number) cannot be paid in twice; a partial unique index allows it again only after it bounced.
+- Nothing is credited while the cheque is `IN_CLEARING`. An admin acts as the clearing house:
+  - **Clear**, cheque of this bank: `TRANSFER_OUT` on the drawer and `TRANSFER_IN` on the depositor in one transaction. If the drawer's account is frozen or short of funds at that moment, the cheque bounces automatically instead.
+  - **Clear**, other bank's cheque: a `DEPOSIT` credit on the depositor.
+  - **Return** with a standard reason (funds insufficient, signature differs, amount mismatch, stale, payment stopped, account frozen).
+- A bounced cheque sends a notice to the depositor and, for a cheque of this bank, to the drawer. Each of the drawer's cheques bounced for insufficient funds costs 30 credit-score points.
+
+**Add money online** (`online_payments`, Razorpay test mode)
+- The customer enters an amount (₹1 to ₹1,00,000, `fn_online_payment_limit`) and pays on Razorpay Checkout from "another bank" with UPI, card or net banking. In test mode no real money moves: the UPI ID `success@razorpay` succeeds and `failure@razorpay` fails.
+- The server creates a Razorpay order and records it (`CREATED`). After payment it verifies Checkout's HMAC-SHA256 signature over `order_id|payment_id` with the key secret, and only then posts a `DEPOSIT` and marks the row `PAID`.
+- Unique keys on the order id, payment id and ledger row mean one payment can never credit twice; a repeated callback returns the same transaction.
+
+### Withdrawals
 - Amounts must be > 0, with at most 2 decimal places.
-- A deposit posts immediately.
 - A withdrawal of ₹50,000 or less posts immediately if the balance is enough.
 - A withdrawal over ₹50,000 is created as `PENDING`. An admin approves it (the balance is re-checked at that point) or rejects it. Funds are not held while it is pending.
 
@@ -98,6 +116,7 @@ Example: `0001 10 00001 5`. CHECK constraints enforce the check digit and that t
 + 50 × loans closed
 − 150 × loans defaulted
 + 2 × account age in months         (capped at +50)
+− 30 × cheques issued that bounced for insufficient funds
 ```
 
 ### Notices
@@ -121,7 +140,8 @@ Example: `0001 10 00001 5`. CHECK constraints enforce the check digit and that t
 - `sp_register_customer`
 - `sp_approve_account`
 - `sp_reject_account`
-- `sp_deposit`
+- `sp_deposit_cheque`, `sp_clear_cheque`, `sp_bounce_cheque`
+- `sp_create_online_payment`, `sp_complete_online_payment`
 - `sp_withdraw`
 - `sp_transfer`
 - `sp_approve_withdrawal`
@@ -143,20 +163,21 @@ Example: `0001 10 00001 5`. CHECK constraints enforce the check digit and that t
 - Assign a staff Admin ID when an admin is inserted.
 - Block transactions on frozen and unopened accounts.
 - Maintain `updated_at`.
-- Write row-change audit entries for `accounts`, `loans` and `transactions` to `audit_log`.
+- Write row-change audit entries for `accounts`, `loans`, `transactions`, `cheque_deposits` and `online_payments` to `audit_log`.
 
 **Views**
 - `v_account_statement`: running balance per transaction.
 - `v_admin_transactions`: transactions joined with customer and account.
 - `v_loan_summary`: loan with current due and totals paid.
 - `v_customer_overview`: customer KYC, branch and IFSC, account or application, balance, status, credit score and active loan.
+- `v_cheque_deposits`: cheque deposits with depositor and, for cheques of this bank, the drawer and their balance.
 
 ## 5. Pages
 
 **Customer** (`/dashboard`)
 - Application status (while pending or rejected)
 - Account summary with IFSC and branch
-- Deposit
+- Deposit: pay in a cheque (laid out like a cheque leaf, amount in words) and track its clearing; or add money through Razorpay
 - Withdraw
 - Transfer (verify payee, then send)
 - Statement
@@ -169,6 +190,7 @@ Example: `0001 10 00001 5`. CHECK constraints enforce the check digit and that t
 - Applications: review KYC details, approve (generates the account number) or reject with a reason
 - Customers: freeze or unfreeze
 - Transactions: filter, reverse, approve or reject withdrawals
+- Cheques: clear or return cheques in clearing
 - Loans: sanction with the suggested rate, reject, run monthly cycle
 - Notices: compose and view sent notices
 

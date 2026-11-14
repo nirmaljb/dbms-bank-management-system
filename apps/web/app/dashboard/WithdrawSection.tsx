@@ -4,19 +4,10 @@ import React, { useState } from 'react';
 import { Panel, FlashMessage, AmountInput, type Flash } from '../components/ui';
 import { apiPost, formatINR, type CustomerOverview } from '../lib/api';
 
-export function MoneySection({
-  mode,
-  overview,
-  onDone,
-}: {
-  mode: 'deposit' | 'withdraw';
-  overview: CustomerOverview;
-  onDone: () => void;
-}) {
+export function WithdrawSection({ overview, onDone }: { overview: CustomerOverview; onDone: () => void }) {
   const [amount, setAmount] = useState('');
   const [flash, setFlash] = useState<Flash>(null);
   const [busy, setBusy] = useState(false);
-  const isDeposit = mode === 'deposit';
   const limit = Number(overview.withdrawal_approval_limit ?? 50000);
   const frozen = overview.account_status === 'FROZEN';
 
@@ -27,7 +18,7 @@ export function MoneySection({
       return;
     }
     setBusy(true);
-    const res = await apiPost<{ txnId: string; status: string }>(`/customer/${mode}`, { amount });
+    const res = await apiPost<{ txnId: string; status: string }>('/customer/withdraw', { amount });
     setBusy(false);
     if (res.error !== undefined) {
       setFlash({ kind: 'error', text: res.error });
@@ -42,7 +33,7 @@ export function MoneySection({
     } else {
       setFlash({
         kind: 'success',
-        text: `${isDeposit ? 'Deposit' : 'Withdrawal'} of ${formatINR(amount)} completed. Reference #${res.data.txnId}.`,
+        text: `Withdrawal of ${formatINR(amount)} completed. Reference #${res.data.txnId}.`,
       });
     }
     onDone();
@@ -50,7 +41,7 @@ export function MoneySection({
 
   return (
     <div className="max-w-xl">
-      <Panel title={isDeposit ? '💵 Deposit' : '🏧 Withdraw'}>
+      <Panel title="🏧 Withdraw">
         <div className="p-4">
           <FlashMessage flash={flash} onClose={() => setFlash(null)} />
           <form onSubmit={submit} className="space-y-3" noValidate>
@@ -72,14 +63,12 @@ export function MoneySection({
                 <AmountInput id="amount" value={amount} onChange={setAmount} />
               </div>
             </div>
-            {!isDeposit && (
-              <p className={`text-[11px] m-0 ${Number(amount) > limit ? 'bank-security-notice' : 'text-slate-500'}`}>
-                Withdrawals above {formatINR(limit)} are sent to a bank officer for approval.
-              </p>
-            )}
+            <p className={`text-[11px] m-0 ${Number(amount) > limit ? 'bank-security-notice' : 'text-slate-500'}`}>
+              Withdrawals above {formatINR(limit)} are sent to a bank officer for approval.
+            </p>
             <div className="pt-3 border-t border-slate-200 flex justify-end">
               <button type="submit" className="bank-btn px-6 disabled:opacity-50" disabled={busy || frozen}>
-                {busy ? 'Processing...' : isDeposit ? 'Deposit' : 'Withdraw'}
+                {busy ? 'Processing...' : 'Withdraw'}
               </button>
             </div>
           </form>

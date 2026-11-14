@@ -78,6 +78,37 @@ const payeeFields = {
 
 export const payeeLookupSchema = z.object(payeeFields);
 
+// Other banks use 9-18 digit account numbers, so only the shape is checked
+// here. sp_deposit_cheque applies the full payee rules to cheques drawn on
+// this bank, and the post-dated / stale rules to the date.
+export const chequeDepositSchema = z.object({
+  chequeNo: z.string().trim().regex(/^\d{6}$/, { message: 'Cheque number must be 6 digits' }),
+  chequeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Enter the date written on the cheque' }),
+  amount: amountSchema,
+  drawerAccountNumber: z
+    .string()
+    .transform((v) => v.replace(/\s/g, ''))
+    .refine((v) => /^\d{9,18}$/.test(v), { message: 'Drawer account number must be 9 to 18 digits' }),
+  drawerIfsc: payeeFields.ifsc,
+});
+
+export const chequeReturnSchema = z.object({
+  reason: z.enum(
+    ['FUNDS_INSUFFICIENT', 'SIGNATURE_MISMATCH', 'AMOUNT_MISMATCH', 'STALE_CHEQUE', 'PAYMENT_STOPPED', 'ACCOUNT_FROZEN'],
+    { required_error: 'Choose a return reason', invalid_type_error: 'Choose a return reason' }
+  ),
+});
+
+export const chequeFilterSchema = z.object({
+  status: z.enum(['IN_CLEARING', 'CLEARED', 'BOUNCED']).optional(),
+});
+
+export const paymentVerifySchema = z.object({
+  orderId: z.string().regex(/^order_\w+$/, { message: 'Invalid payment order' }),
+  paymentId: z.string().regex(/^pay_\w+$/, { message: 'Invalid payment id' }),
+  signature: z.string().regex(/^[a-f0-9]{64}$/, { message: 'Invalid payment signature' }),
+});
+
 export const transferSchema = z.object({
   ...payeeFields,
   amount: amountSchema,

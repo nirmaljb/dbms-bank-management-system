@@ -4,11 +4,14 @@ import { query, callAs } from '../db/pool.js';
 import {
   parseOr400,
   amountBodySchema,
+  chequeDepositSchema,
+  paymentVerifySchema,
   loanRequestSchema,
   payeeLookupSchema,
   transferSchema,
   statementQuerySchema,
 } from '../utils/validation.js';
+import { razorpayKeys, createOrder, isValidPaymentSignature, toPaise } from '../services/razorpay.js';
 
 // Every handler runs behind authenticate + requireRole('customer'), so
 // req.user is always set. All writes go through stored procedures.
@@ -33,15 +36,104 @@ export const customerController = {
     return res.json({ account });
   },
 
-  deposit: async (req: AuthenticatedRequest, res: Response) => {
+  // Pays in a cheque. Nothing is credited until an admin clears it.
+  depositCheque: async (req: AuthenticatedRequest, res: Response) => {
+    const body = parseOr400(chequeDepositSchema, req.body, res);
+    if (!body) return;
+    const row = await callAs<{ p_cheque_id: string }>(
+      userId(req),
+      'CALL sp_deposit_cheque($1, $2, $3::date, $4::numeric, $5, $6, NULL)',
+      [userId(req), body.chequeNo, body.chequeDate, body.amount, body.drawerAccountNumber, body.drawerIfsc]
+    );
+    return res.status(201).json({ chequeId: row.p_cheque_id, status: 'IN_CLEARING' });
+  },
+
+  cheques: async (req: AuthenticatedRequest, res: Response) => {
+    const rows = await query(
+      `SELECT cheque_id, cheque_no, cheque_date, amount, status, return_reason_label,
+              drawer_account_number, drawer_ifsc, is_in_house, credit_txn_id, created_at, decided_at
+       FROM v_cheque_deposits WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT 50`,
+      [userId(req)]
+    );
+    return res.json({ cheques: rows });
+  },
+
+  // What the Add Money page needs: whether the gateway is set up, the
+  // per-payment limit, and recent payments.
+  onlinePayments: async (req: AuthenticatedRequest, res: Response) => {
+    const [limit] = await query<{ limit: string }>(`SELECT fn_online_payment_limit() AS limit`);
+    const rows = await query(
+      `SELECT p.id, p.amount, p.status, p.gateway_order_id, p.gateway_payment_id, p.txn_id, p.created_at, p.paid_at
+       FROM online_payments p JOIN accounts a ON a.id = p.account_id
+       WHERE a.user_id = $1
+       ORDER BY p.created_at DESC LIMIT 20`,
+      [userId(req)]
+    );
+    return res.json({ enabled: razorpayKeys() !== null, limit: limit?.limit, payments: rows });
+  },
+
+  // Step 1 of Add Money: check the account can take the money, create a
+  // Razorpay order for it and record the order. The browser then opens
+  // Razorpay Checkout with the returned order id.
+  createPaymentOrder: async (req: AuthenticatedRequest, res: Response) => {
+    const keys = razorpayKeys();
+    if (!keys) {
+      return res.status(503).json({
+        error: 'Online payments are not set up. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET (test mode) to apps/server/.env.',
+      });
+    }
     const body = parseOr400(amountBodySchema, req.body, res);
     if (!body) return;
+    await query(`SELECT fn_assert_can_add_money($1, $2::numeric)`, [userId(req), body.amount]);
+
+    const [customer] = await query<{ name: string; email: string; phone: string; account_number: string }>(
+      `SELECT name, email, phone, account_number FROM v_customer_overview WHERE user_id = $1`,
+      [userId(req)]
+    );
+    let order;
+    try {
+      order = await createOrder(keys, toPaise(body.amount), `ac${customer!.account_number}-${Date.now()}`, {
+        account_number: customer!.account_number,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(502).json({ error: 'The payment gateway did not respond. Please try again.' });
+    }
+
+    await callAs(userId(req), 'CALL sp_create_online_payment($1, $2::numeric, $3, NULL)', [
+      userId(req),
+      body.amount,
+      order.id,
+    ]);
+    return res.status(201).json({
+      keyId: keys.keyId,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      prefill: { name: customer!.name, email: customer!.email, contact: customer!.phone },
+    });
+  },
+
+  // Step 2: Checkout hands the browser a payment id and signature. The
+  // signature is the proof of payment, so this needs no PIN; the PIN was
+  // asked when the order was created. Credits at most once per order.
+  verifyPayment: async (req: AuthenticatedRequest, res: Response) => {
+    const keys = razorpayKeys();
+    if (!keys) {
+      return res.status(503).json({ error: 'Online payments are not set up' });
+    }
+    const body = parseOr400(paymentVerifySchema, req.body, res);
+    if (!body) return;
+    if (!isValidPaymentSignature(keys.keySecret, body.orderId, body.paymentId, body.signature)) {
+      return res.status(400).json({ error: 'Payment could not be verified. Your account was not credited.' });
+    }
     const row = await callAs<{ p_txn_id: string }>(
       userId(req),
-      'CALL sp_deposit($1, $2::numeric, NULL)',
-      [userId(req), body.amount]
+      'CALL sp_complete_online_payment($1, $2, $3, NULL)',
+      [userId(req), body.orderId, body.paymentId]
     );
-    return res.status(201).json({ txnId: row.p_txn_id, status: 'COMPLETED' });
+    return res.json({ txnId: row.p_txn_id, status: 'COMPLETED' });
   },
 
   withdraw: async (req: AuthenticatedRequest, res: Response) => {

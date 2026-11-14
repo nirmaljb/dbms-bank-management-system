@@ -25,6 +25,10 @@ export function createAdminRoutes(requirePin: RequestHandler): Router {
   router.post('/transactions/:id/reject', requirePin, handle(a.rejectWithdrawal));
   router.post('/transactions/:id/reverse', requirePin, handle(a.reverseTransaction));
 
+  router.get('/cheques', handle(a.cheques));
+  router.post('/cheques/:id/clear', requirePin, handle(a.clearCheque));
+  router.post('/cheques/:id/return', requirePin, handle(a.returnCheque));
+
   router.get('/loans', handle(a.loans));
   router.post('/loans/:id/sanction', requirePin, handle(a.sanctionLoan));
   router.post('/loans/:id/reject', requirePin, handle(a.rejectLoan));

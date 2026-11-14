@@ -47,6 +47,9 @@ const STATUS_STYLES: Record<string, string> = {
   CLOSED: 'bg-[#eef2f6] text-[#334155] border-[#b8c4d2]',
   PENDING: 'bg-[#fff8e6] text-[#8a5a00] border-[#f0c86e]',
   DUE: 'bg-[#fff8e6] text-[#8a5a00] border-[#f0c86e]',
+  IN_CLEARING: 'bg-[#fff8e6] text-[#8a5a00] border-[#f0c86e]',
+  CLEARED: 'bg-[#e6f4e6] text-[#006600] border-[#8fc98f]',
+  BOUNCED: 'bg-[#fff0f0] text-[#990000] border-[#e0a0a0]',
   REVERSED: 'bg-[#f3e8f8] text-[#5b2a72] border-[#c9a3dc]',
   FROZEN: 'bg-[#e6effa] text-[#004c8f] border-[#99b4d1]',
   REJECTED: 'bg-[#fff0f0] text-[#990000] border-[#e0a0a0]',
@@ -61,7 +64,7 @@ export function StatusBadge({ status }: { status: string }) {
         STATUS_STYLES[status] || 'bg-slate-100 text-slate-700 border-slate-300'
       }`}
     >
-      {status === 'FROZEN' ? '❄ FROZEN' : status}
+      {status === 'FROZEN' ? '❄ FROZEN' : status.replace('_', ' ')}
     </span>
   );
 }
@@ -188,11 +191,14 @@ export function PromptDialog({
   danger = false,
   onConfirm,
   onClose,
+  children,
 }: {
   isOpen: boolean;
   title: string;
   message: string;
   inputLabel?: string;
+  /** Extra fields shown under the message, e.g. a select the caller controls. */
+  children?: React.ReactNode;
   confirmText?: string;
   danger?: boolean;
   onConfirm: (input: string) => void;
@@ -227,6 +233,7 @@ export function PromptDialog({
         >
           <div className="p-4 bg-[#fbfcfe] text-slate-800 text-[11.5px] leading-relaxed border-b border-[#ccd9e8] space-y-3">
             <div className="whitespace-pre-line">{message}</div>
+            {children}
             {inputLabel && (
               <label className="block">
                 <span className="block font-bold text-[#003366] mb-1">{inputLabel}</span>

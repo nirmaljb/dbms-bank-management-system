@@ -2,6 +2,7 @@
 -- Read models used by the API. Views are dropped and recreated so column
 -- changes apply cleanly on re-run.
 
+DROP VIEW IF EXISTS v_cheque_deposits;
 DROP VIEW IF EXISTS v_account_statement;
 DROP VIEW IF EXISTS v_admin_transactions;
 DROP VIEW IF EXISTS v_loan_summary;
@@ -161,3 +162,39 @@ JOIN branches b ON b.code = a.branch_code
 LEFT JOIN users dby ON dby.id = a.decided_by
 LEFT JOIN loans ol ON ol.user_id = u.id AND ol.status IN ('PENDING', 'ACTIVE')
 WHERE u.role = 'customer';
+
+-- Cheque deposits with the depositor and, for cheques drawn on this bank,
+-- the drawer. bank_code is the first 4 letters of the IFSC.
+CREATE VIEW v_cheque_deposits AS
+SELECT
+  c.id AS cheque_id,
+  c.cheque_no,
+  c.cheque_date,
+  c.amount,
+  c.status,
+  c.return_reason,
+  fn_cheque_return_label(c.return_reason) AS return_reason_label,
+  c.drawer_account_number,
+  c.drawer_ifsc,
+  left(c.drawer_ifsc, 4) AS drawer_bank_code,
+  (c.drawer_account_id IS NOT NULL) AS is_in_house,
+  du.name AS drawer_name,
+  d.balance AS drawer_balance,
+  d.status AS drawer_account_status,
+  c.credit_txn_id,
+  c.debit_txn_id,
+  c.created_at,
+  c.decided_at,
+  dby.name AS decided_by_name,
+  a.id AS account_id,
+  a.account_number,
+  a.status AS account_status,
+  u.id AS user_id,
+  u.name AS customer_name,
+  u.email AS customer_email
+FROM cheque_deposits c
+JOIN accounts a ON a.id = c.account_id
+JOIN users u ON u.id = a.user_id
+LEFT JOIN accounts d ON d.id = c.drawer_account_id
+LEFT JOIN users du ON du.id = d.user_id
+LEFT JOIN users dby ON dby.id = c.decided_by;

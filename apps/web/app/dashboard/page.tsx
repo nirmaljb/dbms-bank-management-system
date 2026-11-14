@@ -8,7 +8,8 @@ import { BankFooter } from '../components/BankFooter';
 import { FlashMessage } from '../components/ui';
 import { apiGet, type CustomerOverview } from '../lib/api';
 import { SummarySection } from './SummarySection';
-import { MoneySection } from './MoneySection';
+import { DepositSection } from './DepositSection';
+import { WithdrawSection } from './WithdrawSection';
 import { StatementSection } from './StatementSection';
 import { LoansSection } from './LoansSection';
 import { CreditSection } from './CreditSection';
@@ -98,8 +99,8 @@ export default function DashboardPage() {
         ) : (
           <>
             {tab === 'summary' && <SummarySection overview={overview} onNavigate={(t) => setTab(t as Tab)} />}
-            {tab === 'deposit' && <MoneySection mode="deposit" overview={overview} onDone={refresh} />}
-            {tab === 'withdraw' && <MoneySection mode="withdraw" overview={overview} onDone={refresh} />}
+            {tab === 'deposit' && <DepositSection overview={overview} onDone={refresh} />}
+            {tab === 'withdraw' && <WithdrawSection overview={overview} onDone={refresh} />}
             {tab === 'transfer' && <TransferSection overview={overview} onDone={refresh} />}
             {tab === 'statement' && <StatementSection overview={overview} />}
             {tab === 'loans' && <LoansSection overview={overview} onDone={refresh} />}

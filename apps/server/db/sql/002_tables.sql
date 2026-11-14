@@ -64,6 +64,15 @@ BEGIN
 END;
 $$;
 
+-- IFSC shape: 4 letters, a 0, then 6 letters or digits.
+CREATE OR REPLACE FUNCTION fn_is_valid_ifsc(p_ifsc text)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT coalesce(p_ifsc ~ '^[A-Z]{4}0[A-Z0-9]{6}$', false);
+$$;
+
 CREATE OR REPLACE FUNCTION fn_product_code(p_type account_type)
 RETURNS char(2)
 LANGUAGE sql
@@ -222,6 +231,71 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS transactions_account_idx ON transactions (account_id, posted_at, id);
 CREATE INDEX IF NOT EXISTS transactions_status_idx ON transactions (status);
 CREATE INDEX IF NOT EXISTS transactions_loan_idx ON transactions (loan_id) WHERE loan_id IS NOT NULL;
+
+-- A cheque paid in by a customer. No ledger row exists while it is
+-- IN_CLEARING; sp_clear_cheque posts the credit (and, for a cheque drawn on
+-- this bank, the debit on the drawer) when it clears.
+CREATE TABLE IF NOT EXISTS cheque_deposits (
+  id                    bigint GENERATED ALWAYS AS IDENTITY (START WITH 700001) PRIMARY KEY,
+  account_id            uuid NOT NULL REFERENCES accounts (id),
+  cheque_no             char(6) NOT NULL CHECK (cheque_no ~ '^[0-9]{6}$'),
+  cheque_date           date NOT NULL,
+  amount                numeric(14, 2) NOT NULL CHECK (amount > 0),
+  drawer_account_number varchar(18) NOT NULL CHECK (drawer_account_number ~ '^[0-9]{9,18}$'),
+  drawer_ifsc           char(11) NOT NULL CHECK (fn_is_valid_ifsc(drawer_ifsc)),
+  -- Set when the cheque is drawn on this bank (IFSC starts with BNBK).
+  drawer_account_id     uuid REFERENCES accounts (id),
+  status                cheque_status NOT NULL DEFAULT 'IN_CLEARING',
+  return_reason         cheque_return_reason,
+  credit_txn_id         bigint REFERENCES transactions (id),
+  debit_txn_id          bigint REFERENCES transactions (id),
+  submitted_by          uuid NOT NULL REFERENCES users (id),
+  decided_by            uuid REFERENCES users (id),
+  decided_at            timestamptz,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT cheque_deposits_not_own_account CHECK (drawer_account_id IS DISTINCT FROM account_id),
+  CONSTRAINT cheque_deposits_in_house_link CHECK ((left(drawer_ifsc, 4) = 'BNBK') = (drawer_account_id IS NOT NULL)),
+  CONSTRAINT cheque_deposits_cleared_link CHECK (
+    (status = 'CLEARED') = (credit_txn_id IS NOT NULL)
+    AND (status = 'CLEARED' AND drawer_account_id IS NOT NULL) = (debit_txn_id IS NOT NULL)
+  ),
+  CONSTRAINT cheque_deposits_bounced_reason CHECK ((status = 'BOUNCED') = (return_reason IS NOT NULL)),
+  CONSTRAINT cheque_deposits_decided CHECK ((status = 'IN_CLEARING') = (decided_at IS NULL))
+);
+
+-- The same cheque leaf cannot be paid in twice. A returned cheque may be
+-- presented again, so bounced rows are left out.
+CREATE UNIQUE INDEX IF NOT EXISTS cheque_deposits_one_presentation
+  ON cheque_deposits (drawer_ifsc, drawer_account_number, cheque_no) WHERE status <> 'BOUNCED';
+
+CREATE INDEX IF NOT EXISTS cheque_deposits_status_idx ON cheque_deposits (status);
+CREATE INDEX IF NOT EXISTS cheque_deposits_account_idx ON cheque_deposits (account_id);
+
+-- "Add money" through the Razorpay payment gateway (test mode). One row per
+-- gateway order; the account is credited only after the server has verified
+-- the payment signature. The unique keys stop one payment crediting twice.
+CREATE TABLE IF NOT EXISTS online_payments (
+  id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id         uuid NOT NULL REFERENCES accounts (id),
+  amount             numeric(14, 2) NOT NULL CHECK (amount > 0),
+  gateway_order_id   text NOT NULL,
+  gateway_payment_id text,
+  status             online_payment_status NOT NULL DEFAULT 'CREATED',
+  txn_id             bigint REFERENCES transactions (id),
+  created_by         uuid NOT NULL REFERENCES users (id),
+  paid_at            timestamptz,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT online_payments_order_key UNIQUE (gateway_order_id),
+  CONSTRAINT online_payments_payment_key UNIQUE (gateway_payment_id),
+  CONSTRAINT online_payments_txn_key UNIQUE (txn_id),
+  CONSTRAINT online_payments_paid_link CHECK (
+    (status = 'PAID') = (txn_id IS NOT NULL AND gateway_payment_id IS NOT NULL AND paid_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS online_payments_account_idx ON online_payments (account_id);
 
 -- One row per simulated month per active loan.
 CREATE TABLE IF NOT EXISTS loan_dues (

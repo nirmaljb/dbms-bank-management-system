@@ -45,3 +45,27 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TYPE due_status AS ENUM ('DUE', 'PAID', 'MISSED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  -- IN_CLEARING until an admin (acting as the clearing house) clears or
+  -- returns it.
+  CREATE TYPE cheque_status AS ENUM ('IN_CLEARING', 'CLEARED', 'BOUNCED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  -- Standard cheque return reasons.
+  CREATE TYPE cheque_return_reason AS ENUM (
+    'FUNDS_INSUFFICIENT',
+    'SIGNATURE_MISMATCH',
+    'AMOUNT_MISMATCH',
+    'STALE_CHEQUE',
+    'PAYMENT_STOPPED',
+    'ACCOUNT_FROZEN'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  -- CREATED when the gateway order is made, PAID once the payment signature
+  -- is verified and the account credited.
+  CREATE TYPE online_payment_status AS ENUM ('CREATED', 'PAID');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

@@ -1,6 +1,6 @@
 # Bharat National Bank — DBMS Lab Bank Management System
 
-A fictional retail bank. Customers apply online for a savings or current account at a branch, and once an admin approves it they get a 12-digit account number (branch + product + sequence + check digit) and their branch's IFSC code. They can then deposit, withdraw, transfer money to other accounts by account number + IFSC, take a loan and track their credit score. Admins sign in with a bank-issued Admin ID and approve account applications, approve large withdrawals, reverse transactions, freeze accounts, sanction loans, run the monthly loan cycle and send notices.
+A fictional retail bank. Customers apply online for a savings or current account at a branch, and once an admin approves it they get a 12-digit account number (branch + product + sequence + check digit) and their branch's IFSC code. They can then deposit cheques (cleared by the bank) or add money online through Razorpay test mode, withdraw, transfer money to other accounts by account number + IFSC, take a loan and track their credit score. Admins sign in with a bank-issued Admin ID and approve account applications, clear or return cheques, approve large withdrawals, reverse transactions, freeze accounts, sanction loans, run the monthly loan cycle and send notices.
 
 All banking rules live **in PostgreSQL** as stored procedures, triggers, functions and views ([ADR 0002](docs/adr/0002-banking-logic-in-postgres.md)). Express only authenticates the caller and `CALL`s them. Full rules: [docs/BANKING-SPEC.md](docs/BANKING-SPEC.md).
 
@@ -18,7 +18,11 @@ All banking rules live **in PostgreSQL** as stored procedures, triggers, functio
    ```
    DATABASE_URL=postgresql://...   # NeonDB or any Postgres 14+
    JWT_SECRET=some-long-random-string
+   # optional, for "Add money": Razorpay test-mode keys (Dashboard → Test Mode → API Keys)
+   RAZORPAY_KEY_ID=rzp_test_...
+   RAZORPAY_KEY_SECRET=...
    ```
+   Without the Razorpay keys everything else works; customers can still deposit cheques. Live keys are refused.
 2. Install and build the database:
    ```sh
    npm install
@@ -41,16 +45,20 @@ All banking rules live **in PostgreSQL** as stored procedures, triggers, functio
 
 ## Database objects
 
-- **Tables**: `users`, `accounts`, `transactions`, `loans`, `loan_dues`, `notices`, `notice_reads`, `audit_log`
-- **Procedures**: `sp_deposit`, `sp_withdraw`, `sp_approve_withdrawal`, `sp_reject_withdrawal`, `sp_reverse_transaction`, `sp_set_account_status`, `sp_request_loan`, `sp_sanction_loan`, `sp_reject_loan`, `sp_pay_interest`, `sp_repay_principal`, `sp_run_monthly_cycle`
+- **Tables**: `users`, `accounts`, `transactions`, `cheque_deposits`, `online_payments`, `loans`, `loan_dues`, `notices`, `notice_reads`, `audit_log`
+- **Procedures**: `sp_deposit_cheque`, `sp_clear_cheque`, `sp_bounce_cheque`, `sp_create_online_payment`, `sp_complete_online_payment`, `sp_withdraw`, `sp_approve_withdrawal`, `sp_reject_withdrawal`, `sp_reverse_transaction`, `sp_set_account_status`, `sp_request_loan`, `sp_sanction_loan`, `sp_reject_loan`, `sp_pay_interest`, `sp_repay_principal`, `sp_run_monthly_cycle`
 - **Functions**: `fn_credit_score`, `fn_credit_score_breakdown`, `fn_suggested_rate`, plus helpers
 - **Triggers**: account auto-creation, frozen-account block, append-only ledger, balance posting, `updated_at`, row audit
-- **Views**: `v_account_statement`, `v_admin_transactions`, `v_loan_summary`, `v_customer_overview`
+- **Views**: `v_account_statement`, `v_admin_transactions`, `v_loan_summary`, `v_customer_overview`, `v_cheque_deposits`
 
 Try it in `psql`:
 
 ```sql
-CALL sp_deposit((SELECT id FROM users WHERE email = 'demo@example.com'), 2500.00, NULL);
+-- demo pays in a cheque from another bank, then the admin clears it
+CALL sp_deposit_cheque((SELECT id FROM users WHERE email = 'demo@example.com'),
+                       '000123', current_date, 2500.00, '50100123456789', 'HDFC0001234', NULL);
+CALL sp_clear_cheque((SELECT id FROM users WHERE role = 'admin' LIMIT 1),
+                     (SELECT max(id) FROM cheque_deposits), NULL, NULL);
 SELECT * FROM v_account_statement ORDER BY posted_at DESC LIMIT 5;
 SELECT * FROM fn_credit_score_breakdown((SELECT id FROM users WHERE email = 'demo@example.com'));
 SELECT table_name, action, changed_at FROM audit_log ORDER BY id DESC LIMIT 10;

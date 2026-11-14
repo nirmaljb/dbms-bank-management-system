@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Panel, StatTile, FlashMessage, LoadingRow } from '../components/ui';
 import { apiGet, formatINR, type AdminBranch, type AdminStats } from '../lib/api';
 
-type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'loans' | 'notices';
+type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'cheques' | 'loans' | 'notices';
 
 export function OverviewSection({
   stats,
@@ -46,7 +46,7 @@ export function OverviewSection({
       </Panel>
 
       <Panel title="⏳ Pending Items" tone="admin">
-        <div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           <StatTile
             label="Account applications"
             value={stats.pending_applications}
@@ -60,6 +60,13 @@ export function OverviewSection({
             hint={`${formatINR(stats.pending_withdrawal_amount)} requested · click to review`}
             tone={stats.pending_withdrawals ? 'warn' : 'default'}
             onClick={() => onNavigate('transactions', { status: 'PENDING', type: 'WITHDRAWAL' })}
+          />
+          <StatTile
+            label="Cheques in clearing"
+            value={stats.cheques_in_clearing}
+            hint={`${formatINR(stats.cheques_in_clearing_amount)} · click to clear or return`}
+            tone={stats.cheques_in_clearing ? 'warn' : 'default'}
+            onClick={() => onNavigate('cheques')}
           />
           <StatTile
             label="Loan requests awaiting decision"

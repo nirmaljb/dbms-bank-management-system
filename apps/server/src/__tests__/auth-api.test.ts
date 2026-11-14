@@ -246,7 +246,7 @@ describe('Auth API Endpoints', () => {
 
     it('returns 403 for an admin on customer routes', async () => {
       const cookie = await cookieFor('admin');
-      const res = await request(app).post('/api/customer/deposit').set('Cookie', cookie).send({ amount: '10' });
+      const res = await request(app).post('/api/customer/withdraw').set('Cookie', cookie).send({ amount: '10' });
       expect(res.status).toBe(403);
     });
   });

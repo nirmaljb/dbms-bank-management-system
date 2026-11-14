@@ -85,15 +85,6 @@ BEGIN
 END;
 $$;
 
--- IFSC shape: 4 letters, a 0, then 6 letters or digits.
-CREATE OR REPLACE FUNCTION fn_is_valid_ifsc(p_ifsc text)
-RETURNS boolean
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT coalesce(p_ifsc ~ '^[A-Z]{4}0[A-Z0-9]{6}$', false);
-$$;
-
 -- Whole months between two timestamps.
 CREATE OR REPLACE FUNCTION fn_months_between(p_from timestamptz, p_to timestamptz)
 RETURNS integer
@@ -111,6 +102,7 @@ $$;
 --   + 50 x loans closed
 --   - 150 x loans defaulted
 --   + 2 x account age in months         (capped at +50)
+--   - 30 x cheques issued that bounced for insufficient funds
 CREATE OR REPLACE FUNCTION fn_credit_score_breakdown(p_user_id uuid)
 RETURNS TABLE (sort_order integer, component text, occurrences integer, points integer)
 LANGUAGE sql
@@ -127,7 +119,9 @@ AS $$
       (SELECT count(*) FROM loans
         WHERE user_id = p_user_id AND status = 'DEFAULTED')::integer  AS loans_defaulted,
       coalesce((SELECT fn_months_between(opened_at, now()) FROM accounts
-        WHERE user_id = p_user_id AND opened_at IS NOT NULL), 0)                                AS account_months
+        WHERE user_id = p_user_id AND opened_at IS NOT NULL), 0)                                AS account_months,
+      (SELECT count(*) FROM cheque_deposits c JOIN accounts a ON a.id = c.drawer_account_id
+        WHERE a.user_id = p_user_id AND c.return_reason = 'FUNDS_INSUFFICIENT')::integer AS cheques_bounced
   )
   SELECT c.sort_order, c.component, c.occurrences, c.points
   FROM stats s
@@ -137,7 +131,8 @@ AS $$
     (3, 'Missed dues',                    s.dues_missed,     -40 * s.dues_missed),
     (4, 'Loans closed',                   s.loans_closed,    50 * s.loans_closed),
     (5, 'Loans defaulted',                s.loans_defaulted, -150 * s.loans_defaulted),
-    (6, 'Account age (months)',           s.account_months,  least(2 * s.account_months, 50))
+    (6, 'Account age (months)',           s.account_months,  least(2 * s.account_months, 50)),
+    (7, 'Cheques bounced (no funds)',     s.cheques_bounced, -30 * s.cheques_bounced)
   ) AS c (sort_order, component, occurrences, points)
   ORDER BY c.sort_order;
 $$;

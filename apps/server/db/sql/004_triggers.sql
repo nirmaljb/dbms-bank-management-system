@@ -34,6 +34,14 @@ CREATE OR REPLACE TRIGGER trg_transactions_updated_at
   BEFORE UPDATE ON transactions
   FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
+CREATE OR REPLACE TRIGGER trg_cheque_deposits_updated_at
+  BEFORE UPDATE ON cheque_deposits
+  FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_online_payments_updated_at
+  BEFORE UPDATE ON online_payments
+  FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+
 ------------------------------------------------------------------------------
 -- Give every admin a staff ID (BNBA0001, BNBA0002, ...) when the row is
 -- inserted. This is the Admin ID they sign in with at /admin/login.
@@ -167,7 +175,7 @@ CREATE OR REPLACE TRIGGER trg_transactions_apply_balance
   FOR EACH ROW EXECUTE FUNCTION fn_transactions_apply_balance();
 
 ------------------------------------------------------------------------------
--- Row-change audit for accounts, loans and transactions
+-- Row-change audit for accounts, loans, transactions, cheques and online payments
 ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_audit_row_change()
 RETURNS trigger
@@ -205,4 +213,12 @@ CREATE OR REPLACE TRIGGER trg_loans_audit
 
 CREATE OR REPLACE TRIGGER trg_transactions_audit
   AFTER INSERT OR UPDATE OR DELETE ON transactions
+  FOR EACH ROW EXECUTE FUNCTION fn_audit_row_change();
+
+CREATE OR REPLACE TRIGGER trg_cheque_deposits_audit
+  AFTER INSERT OR UPDATE OR DELETE ON cheque_deposits
+  FOR EACH ROW EXECUTE FUNCTION fn_audit_row_change();
+
+CREATE OR REPLACE TRIGGER trg_online_payments_audit
+  AFTER INSERT OR UPDATE OR DELETE ON online_payments
   FOR EACH ROW EXECUTE FUNCTION fn_audit_row_change();

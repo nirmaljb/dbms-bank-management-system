@@ -10,16 +10,18 @@ import {
   transactionFilterSchema,
   loanFilterSchema,
   applicationFilterSchema,
+  chequeFilterSchema,
+  chequeReturnSchema,
 } from '../utils/validation.js';
 
 // Every handler runs behind authenticate + requireRole('admin'). The
 // procedures also re-check the admin role via fn_require_admin.
 const adminId = (req: AuthenticatedRequest) => req.user!.id;
 
-function txnIdParam(req: AuthenticatedRequest, res: Response): string | null {
+function txnIdParam(req: AuthenticatedRequest, res: Response, what = 'transaction'): string | null {
   const id = req.params.id ?? '';
   if (!/^\d+$/.test(id)) {
-    res.status(400).json({ error: 'Invalid transaction id' });
+    res.status(400).json({ error: `Invalid ${what} id` });
     return null;
   }
   return id;
@@ -38,6 +40,9 @@ export const adminController = {
            WHERE type = 'WITHDRAWAL' AND status = 'PENDING')                               AS pending_withdrawals,
          (SELECT coalesce(sum(amount), 0) FROM transactions
            WHERE type = 'WITHDRAWAL' AND status = 'PENDING')                               AS pending_withdrawal_amount,
+         (SELECT count(*)::int FROM cheque_deposits WHERE status = 'IN_CLEARING')          AS cheques_in_clearing,
+         (SELECT coalesce(sum(amount), 0) FROM cheque_deposits
+           WHERE status = 'IN_CLEARING')                                                   AS cheques_in_clearing_amount,
          (SELECT count(*)::int FROM loans WHERE status = 'PENDING')                        AS pending_loans,
          (SELECT count(*)::int FROM loans WHERE status = 'ACTIVE')                         AS active_loans,
          (SELECT coalesce(sum(outstanding_principal), 0) FROM loans WHERE status = 'ACTIVE') AS outstanding_principal,
@@ -179,6 +184,45 @@ export const adminController = {
       [adminId(req), id, body.reason ?? null]
     );
     return res.status(201).json({ reversalTxnId: row.p_reversal_id });
+  },
+
+  cheques: async (req: AuthenticatedRequest, res: Response) => {
+    const f = parseOr400(chequeFilterSchema, req.query, res);
+    if (!f) return;
+    const rows = await query(
+      `SELECT * FROM v_cheque_deposits
+       WHERE $1::cheque_status IS NULL OR status = $1::cheque_status
+       ORDER BY (status = 'IN_CLEARING') DESC, created_at DESC
+       LIMIT 500`,
+      [f.status ?? null]
+    );
+    return res.json({ cheques: rows });
+  },
+
+  // Acting as the clearing house. A cheque drawn on this bank may come back
+  // BOUNCED (drawer short of funds or frozen) instead of CLEARED.
+  clearCheque: async (req: AuthenticatedRequest, res: Response) => {
+    const id = txnIdParam(req, res, 'cheque');
+    if (!id) return;
+    const row = await callAs<{ p_status: string; p_txn_id: string | null }>(
+      adminId(req),
+      'CALL sp_clear_cheque($1, $2::bigint, NULL, NULL)',
+      [adminId(req), id]
+    );
+    return res.json({ status: row.p_status, creditTxnId: row.p_txn_id });
+  },
+
+  returnCheque: async (req: AuthenticatedRequest, res: Response) => {
+    const id = txnIdParam(req, res, 'cheque');
+    if (!id) return;
+    const body = parseOr400(chequeReturnSchema, req.body, res);
+    if (!body) return;
+    await callAs(adminId(req), 'CALL sp_bounce_cheque($1, $2::bigint, $3::cheque_return_reason)', [
+      adminId(req),
+      id,
+      body.reason,
+    ]);
+    return res.json({ status: 'BOUNCED' });
   },
 
   loans: async (req: AuthenticatedRequest, res: Response) => {

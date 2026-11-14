@@ -6,7 +6,7 @@
 -- caller gets a clear message instead of a constraint violation.
 --
 -- Procedures that create a row return its id through an INOUT parameter:
---   CALL sp_deposit('<user uuid>', 500.00, NULL);  -- returns p_txn_id
+--   CALL sp_withdraw('<user uuid>', 500.00, NULL, NULL);  -- returns p_txn_id, p_status
 
 -- Withdrawals above this amount wait for admin approval.
 CREATE OR REPLACE FUNCTION fn_withdrawal_approval_limit()
@@ -134,18 +134,54 @@ BEGIN
 END;
 $$;
 
+-- Customers cannot type in a deposit amount any more: money comes in by
+-- cheque (cleared by an admin) or through the payment gateway.
+DROP PROCEDURE IF EXISTS sp_deposit(uuid, numeric, bigint);
+
+-- A cheque is valid for 3 months from the date written on it.
+CREATE OR REPLACE FUNCTION fn_cheque_validity()
+RETURNS interval
+LANGUAGE sql
+IMMUTABLE
+AS $$ SELECT interval '3 months' $$;
+
+CREATE OR REPLACE FUNCTION fn_cheque_return_label(p_reason cheque_return_reason)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE p_reason
+    WHEN 'FUNDS_INSUFFICIENT' THEN 'Funds insufficient'
+    WHEN 'SIGNATURE_MISMATCH' THEN 'Drawer''s signature differs'
+    WHEN 'AMOUNT_MISMATCH'    THEN 'Amount in words and figures differ'
+    WHEN 'STALE_CHEQUE'       THEN 'Cheque is stale'
+    WHEN 'PAYMENT_STOPPED'    THEN 'Payment stopped by drawer'
+    WHEN 'ACCOUNT_FROZEN'     THEN 'Drawer''s account is frozen'
+  END;
+$$;
+
 ------------------------------------------------------------------------------
--- Customer: deposit
+-- Customer: pay in a cheque. Nothing is credited yet: the cheque waits
+-- IN_CLEARING until an admin clears or returns it. A cheque drawn on this
+-- bank (IFSC BNBK...) is checked like a payee: valid check digit, IFSC of the
+-- account's branch.
 ------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE sp_deposit(
+CREATE OR REPLACE PROCEDURE sp_deposit_cheque(
   p_user_id uuid,
+  p_cheque_no text,
+  p_cheque_date date,
   p_amount numeric,
-  INOUT p_txn_id bigint DEFAULT NULL
+  p_drawer_account_number text,
+  p_drawer_ifsc text,
+  INOUT p_cheque_id bigint DEFAULT NULL
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
   v_account accounts;
+  v_drawer accounts;
+  v_number text := regexp_replace(coalesce(p_drawer_account_number, ''), '\s', '', 'g');
+  v_ifsc text := upper(trim(coalesce(p_drawer_ifsc, '')));
 BEGIN
   PERFORM fn_assert_amount(p_amount);
   v_account := fn_lock_customer_account(p_user_id);
@@ -153,10 +189,320 @@ BEGIN
   IF v_account.status = 'FROZEN' THEN
     RAISE EXCEPTION 'Your account is frozen. Deposits are not allowed.';
   END IF;
+  IF p_cheque_no IS NULL OR p_cheque_no !~ '^[0-9]{6}$' THEN
+    RAISE EXCEPTION 'Cheque number must be the 6 digits printed at the bottom of the cheque';
+  END IF;
+  IF p_cheque_date IS NULL THEN
+    RAISE EXCEPTION 'Enter the date written on the cheque';
+  END IF;
+  IF p_cheque_date > current_date THEN
+    RAISE EXCEPTION 'This cheque is post-dated (%). It can be deposited on or after that date.',
+      to_char(p_cheque_date, 'DD Mon YYYY');
+  END IF;
+  IF p_cheque_date < current_date - fn_cheque_validity() THEN
+    RAISE EXCEPTION 'This cheque is stale. A cheque is valid for 3 months from the date written on it.';
+  END IF;
+  IF NOT fn_is_valid_ifsc(v_ifsc) THEN
+    RAISE EXCEPTION 'IFSC must be 11 characters, e.g. HDFC0001234';
+  END IF;
 
-  INSERT INTO transactions (account_id, type, direction, amount, status, description, created_by, posted_at)
-  VALUES (v_account.id, 'DEPOSIT', 'CR', p_amount, 'COMPLETED', 'Cash deposit', p_user_id, now())
+  IF left(v_ifsc, 4) = 'BNBK' THEN
+    v_drawer := fn_find_payee(v_number, v_ifsc);
+    IF v_drawer.id = v_account.id THEN
+      RAISE EXCEPTION 'This cheque is drawn on your own account. Use Withdraw to take cash out instead.';
+    END IF;
+  ELSIF v_number !~ '^[0-9]{9,18}$' THEN
+    RAISE EXCEPTION 'Drawer account number must be 9 to 18 digits';
+  END IF;
+
+  -- cheque_deposits_one_presentation enforces this too; checking first gives a clearer message.
+  IF EXISTS (
+    SELECT 1 FROM cheque_deposits
+    WHERE drawer_ifsc = v_ifsc AND drawer_account_number = v_number AND cheque_no = p_cheque_no
+      AND status <> 'BOUNCED'
+  ) THEN
+    RAISE EXCEPTION 'Cheque % from account % has already been deposited', p_cheque_no, v_number;
+  END IF;
+
+  INSERT INTO cheque_deposits (
+    account_id, cheque_no, cheque_date, amount, drawer_account_number, drawer_ifsc,
+    drawer_account_id, submitted_by
+  )
+  VALUES (
+    v_account.id, p_cheque_no, p_cheque_date, p_amount, v_number, v_ifsc,
+    v_drawer.id, p_user_id
+  )
+  RETURNING id INTO p_cheque_id;
+END;
+$$;
+
+------------------------------------------------------------------------------
+-- Admin (as the clearing house): return a cheque unpaid. Both the depositor
+-- and, for a cheque drawn on this bank, the drawer get a notice.
+------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE sp_bounce_cheque(
+  p_admin_id uuid,
+  p_cheque_id bigint,
+  p_reason cheque_return_reason
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_chq cheque_deposits;
+  v_text text;
+BEGIN
+  PERFORM fn_require_admin(p_admin_id);
+  IF p_reason IS NULL THEN
+    RAISE EXCEPTION 'Choose a return reason';
+  END IF;
+
+  SELECT * INTO v_chq FROM cheque_deposits WHERE id = p_cheque_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Cheque deposit % not found', p_cheque_id USING ERRCODE = 'no_data_found';
+  END IF;
+  IF v_chq.status <> 'IN_CLEARING' THEN
+    RAISE EXCEPTION 'Cheque deposit % is already %', p_cheque_id, v_chq.status;
+  END IF;
+
+  UPDATE cheque_deposits
+  SET status = 'BOUNCED',
+      return_reason = p_reason,
+      decided_by = p_admin_id,
+      decided_at = now()
+  WHERE id = p_cheque_id;
+
+  v_text := 'Cheque no. ' || v_chq.cheque_no || ' for ' || fn_format_inr(v_chq.amount)
+         || ' (clearing ref #' || v_chq.id || ') was returned unpaid. Reason: '
+         || fn_cheque_return_label(p_reason) || '.';
+
+  INSERT INTO notices (title, body, recipient_user_id, created_by)
+  SELECT 'Cheque returned', v_text || ' Your account was not credited.', a.user_id, p_admin_id
+  FROM accounts a WHERE a.id = v_chq.account_id
+  UNION ALL
+  SELECT 'Cheque you issued was returned', v_text, a.user_id, p_admin_id
+  FROM accounts a WHERE a.id = v_chq.drawer_account_id;
+END;
+$$;
+
+------------------------------------------------------------------------------
+-- Admin (as the clearing house): clear a cheque.
+--   Drawn on this bank: debit the drawer (TRANSFER_OUT) and credit the
+--   depositor (TRANSFER_IN) together. If the drawer's account is frozen or
+--   short of funds the cheque is returned instead, and p_status says so.
+--   Drawn on another bank: credit the depositor (DEPOSIT).
+------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE sp_clear_cheque(
+  p_admin_id uuid,
+  p_cheque_id bigint,
+  INOUT p_status cheque_status DEFAULT NULL,
+  INOUT p_txn_id bigint DEFAULT NULL
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_chq cheque_deposits;
+  v_payee accounts;
+  v_drawer accounts;
+  v_payee_name text;
+  v_drawer_name text;
+  v_debit_id bigint;
+BEGIN
+  PERFORM fn_require_admin(p_admin_id);
+
+  -- Lock both accounts in id order, then the cheque, like sp_transfer.
+  PERFORM 1 FROM accounts
+  WHERE id IN (
+    SELECT account_id FROM cheque_deposits WHERE id = p_cheque_id
+    UNION ALL
+    SELECT drawer_account_id FROM cheque_deposits WHERE id = p_cheque_id
+  )
+  ORDER BY id
+  FOR UPDATE;
+
+  SELECT * INTO v_chq FROM cheque_deposits WHERE id = p_cheque_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Cheque deposit % not found', p_cheque_id USING ERRCODE = 'no_data_found';
+  END IF;
+  IF v_chq.status <> 'IN_CLEARING' THEN
+    RAISE EXCEPTION 'Cheque deposit % is already %', p_cheque_id, v_chq.status;
+  END IF;
+
+  SELECT * INTO v_payee FROM accounts WHERE id = v_chq.account_id;
+  IF v_payee.status = 'FROZEN' THEN
+    RAISE EXCEPTION 'Account % is frozen. Return the cheque or unfreeze the account first.',
+      v_payee.account_number;
+  END IF;
+
+  IF v_chq.drawer_account_id IS NULL THEN
+    INSERT INTO transactions (
+      account_id, type, direction, amount, status, description, remarks,
+      created_by, processed_by, processed_at, posted_at
+    )
+    VALUES (
+      v_payee.id, 'DEPOSIT', 'CR', v_chq.amount, 'COMPLETED',
+      'Cheque deposit no. ' || v_chq.cheque_no || ' (' || v_chq.drawer_ifsc || ')',
+      'Clearing ref #' || v_chq.id,
+      v_chq.submitted_by, p_admin_id, now(), now()
+    )
+    RETURNING id INTO p_txn_id;
+  ELSE
+    SELECT * INTO v_drawer FROM accounts WHERE id = v_chq.drawer_account_id;
+    IF v_drawer.status <> 'ACTIVE' THEN
+      CALL sp_bounce_cheque(p_admin_id, p_cheque_id, 'ACCOUNT_FROZEN');
+      p_status := 'BOUNCED';
+      RETURN;
+    END IF;
+    IF v_drawer.balance < v_chq.amount THEN
+      CALL sp_bounce_cheque(p_admin_id, p_cheque_id, 'FUNDS_INSUFFICIENT');
+      p_status := 'BOUNCED';
+      RETURN;
+    END IF;
+
+    SELECT name INTO v_payee_name FROM users WHERE id = v_payee.user_id;
+    SELECT name INTO v_drawer_name FROM users WHERE id = v_drawer.user_id;
+
+    INSERT INTO transactions (
+      account_id, type, direction, amount, status, description, remarks,
+      counterparty_account_id, created_by, processed_by, processed_at, posted_at
+    )
+    VALUES (
+      v_drawer.id, 'TRANSFER_OUT', 'DR', v_chq.amount, 'COMPLETED',
+      'Cheque no. ' || v_chq.cheque_no || ' paid to ' || v_payee.account_number
+        || ' (' || fn_mask_name(v_payee_name) || ')',
+      'Clearing ref #' || v_chq.id,
+      v_payee.id, v_chq.submitted_by, p_admin_id, now(), now()
+    )
+    RETURNING id INTO v_debit_id;
+
+    INSERT INTO transactions (
+      account_id, type, direction, amount, status, description, remarks,
+      counterparty_account_id, created_by, processed_by, processed_at, posted_at
+    )
+    VALUES (
+      v_payee.id, 'TRANSFER_IN', 'CR', v_chq.amount, 'COMPLETED',
+      'Cheque deposit no. ' || v_chq.cheque_no || ' from ' || v_drawer.account_number
+        || ' (' || fn_mask_name(v_drawer_name) || ')',
+      'Clearing ref #' || v_chq.id,
+      v_drawer.id, v_chq.submitted_by, p_admin_id, now(), now()
+    )
+    RETURNING id INTO p_txn_id;
+  END IF;
+
+  UPDATE cheque_deposits
+  SET status = 'CLEARED',
+      credit_txn_id = p_txn_id,
+      debit_txn_id = v_debit_id,
+      decided_by = p_admin_id,
+      decided_at = now()
+  WHERE id = p_cheque_id;
+  p_status := 'CLEARED';
+END;
+$$;
+
+------------------------------------------------------------------------------
+-- Online "Add money" through the payment gateway (Razorpay, test mode).
+-- The server creates a gateway order, records it here, and credits the
+-- account only after it has verified the payment signature.
+------------------------------------------------------------------------------
+
+-- Largest single online deposit, the same as the usual UPI limit.
+CREATE OR REPLACE FUNCTION fn_online_payment_limit()
+RETURNS numeric
+LANGUAGE sql
+IMMUTABLE
+AS $$ SELECT 100000.00::numeric $$;
+
+-- Raises unless the customer may add this amount online. Called before the
+-- gateway order is created, so a frozen account never reaches the gateway.
+CREATE OR REPLACE FUNCTION fn_assert_can_add_money(p_user_id uuid, p_amount numeric)
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_status account_status;
+BEGIN
+  PERFORM fn_assert_amount(p_amount);
+  SELECT a.status INTO v_status
+  FROM accounts a JOIN users u ON u.id = a.user_id
+  WHERE a.user_id = p_user_id AND u.role = 'customer';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No account found for this customer' USING ERRCODE = 'no_data_found';
+  END IF;
+  IF v_status <> 'ACTIVE' THEN
+    RAISE EXCEPTION 'Your account is %. Money cannot be added to it right now.', lower(v_status::text);
+  END IF;
+  IF p_amount < 1 THEN
+    RAISE EXCEPTION 'The smallest amount you can add online is ₹1.00';
+  END IF;
+  IF p_amount > fn_online_payment_limit() THEN
+    RAISE EXCEPTION 'You can add at most % in one online payment', fn_format_inr(fn_online_payment_limit());
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE sp_create_online_payment(
+  p_user_id uuid,
+  p_amount numeric,
+  p_gateway_order_id text,
+  INOUT p_payment_id bigint DEFAULT NULL
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_account accounts;
+BEGIN
+  v_account := fn_lock_customer_account(p_user_id);
+  PERFORM fn_assert_can_add_money(p_user_id, p_amount);
+
+  INSERT INTO online_payments (account_id, amount, gateway_order_id, created_by)
+  VALUES (v_account.id, p_amount, p_gateway_order_id, p_user_id)
+  RETURNING id INTO p_payment_id;
+END;
+$$;
+
+-- Credits the account for a gateway order whose signature the server has
+-- verified. Calling it again with the same payment returns the same ledger
+-- row, so a retried callback never credits twice.
+CREATE OR REPLACE PROCEDURE sp_complete_online_payment(
+  p_user_id uuid,
+  p_gateway_order_id text,
+  p_gateway_payment_id text,
+  INOUT p_txn_id bigint DEFAULT NULL
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_account accounts;
+  v_pay online_payments;
+BEGIN
+  v_account := fn_lock_customer_account(p_user_id);
+
+  SELECT * INTO v_pay FROM online_payments
+  WHERE gateway_order_id = p_gateway_order_id AND account_id = v_account.id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Payment order % not found', p_gateway_order_id USING ERRCODE = 'no_data_found';
+  END IF;
+  IF v_pay.status = 'PAID' THEN
+    IF v_pay.gateway_payment_id = p_gateway_payment_id THEN
+      p_txn_id := v_pay.txn_id;
+      RETURN;
+    END IF;
+    RAISE EXCEPTION 'This payment order has already been paid';
+  END IF;
+
+  INSERT INTO transactions (account_id, type, direction, amount, status, description, remarks, created_by, posted_at)
+  VALUES (v_account.id, 'DEPOSIT', 'CR', v_pay.amount, 'COMPLETED',
+          'Online deposit via Razorpay', p_gateway_payment_id, p_user_id, now())
   RETURNING id INTO p_txn_id;
+
+  UPDATE online_payments
+  SET status = 'PAID',
+      gateway_payment_id = p_gateway_payment_id,
+      txn_id = p_txn_id,
+      paid_at = now()
+  WHERE id = v_pay.id;
 END;
 $$;
 

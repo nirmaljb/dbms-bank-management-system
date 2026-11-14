@@ -287,6 +287,67 @@ export interface AdminBranch extends Branch {
   deposits: string;
 }
 
+export type ChequeStatus = 'IN_CLEARING' | 'CLEARED' | 'BOUNCED';
+export type ChequeReturnReason =
+  | 'FUNDS_INSUFFICIENT'
+  | 'SIGNATURE_MISMATCH'
+  | 'AMOUNT_MISMATCH'
+  | 'STALE_CHEQUE'
+  | 'PAYMENT_STOPPED'
+  | 'ACCOUNT_FROZEN';
+
+// Same wording as fn_cheque_return_label.
+export const CHEQUE_RETURN_REASONS: Record<ChequeReturnReason, string> = {
+  FUNDS_INSUFFICIENT: 'Funds insufficient',
+  SIGNATURE_MISMATCH: "Drawer's signature differs",
+  AMOUNT_MISMATCH: 'Amount in words and figures differ',
+  STALE_CHEQUE: 'Cheque is stale',
+  PAYMENT_STOPPED: 'Payment stopped by drawer',
+  ACCOUNT_FROZEN: "Drawer's account is frozen",
+};
+
+export interface ChequeDeposit {
+  cheque_id: string;
+  cheque_no: string;
+  cheque_date: string;
+  amount: string;
+  status: ChequeStatus;
+  return_reason_label: string | null;
+  drawer_account_number: string;
+  drawer_ifsc: string;
+  is_in_house: boolean;
+  credit_txn_id: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface AdminCheque extends ChequeDeposit {
+  return_reason: ChequeReturnReason | null;
+  drawer_bank_code: string;
+  drawer_name: string | null;
+  drawer_balance: string | null;
+  drawer_account_status: AccountStatus | null;
+  debit_txn_id: string | null;
+  decided_by_name: string | null;
+  account_id: string;
+  account_number: string;
+  account_status: AccountStatus;
+  user_id: string;
+  customer_name: string;
+  customer_email: string;
+}
+
+export interface OnlinePayment {
+  id: string;
+  amount: string;
+  status: 'CREATED' | 'PAID';
+  gateway_order_id: string;
+  gateway_payment_id: string | null;
+  txn_id: string | null;
+  created_at: string;
+  paid_at: string | null;
+}
+
 export interface AdminStats {
   customer_count: number;
   pending_applications: number;
@@ -295,6 +356,8 @@ export interface AdminStats {
   frozen_accounts: number;
   pending_withdrawals: number;
   pending_withdrawal_amount: string;
+  cheques_in_clearing: number;
+  cheques_in_clearing_amount: string;
   pending_loans: number;
   active_loans: number;
   outstanding_principal: string;

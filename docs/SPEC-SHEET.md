@@ -35,7 +35,11 @@ One-page reference for the Bharat National Bank backend. Business rules live in 
 | Method | Path | Body / Query | Returns | DB call |
 |---|---|---|---|---|
 | GET | `/overview` | — | `{ account }` (+ `withdrawal_approval_limit`, `unread_notices`) | `v_customer_overview` |
-| POST 🔒 | `/deposit` | `amount` | `201 { txnId, status }` | `sp_deposit` |
+| GET | `/cheques` | — | `{ cheques }` (latest 50) | `v_cheque_deposits` |
+| POST 🔒 | `/cheques` | `chequeNo, chequeDate, amount, drawerAccountNumber, drawerIfsc` | `201 { chequeId, status: "IN_CLEARING" }` | `sp_deposit_cheque` |
+| GET | `/add-money` | — | `{ enabled, limit, payments }` | `online_payments` |
+| POST 🔒 | `/add-money/order` | `amount` | `201 { keyId, orderId, amount (paise), currency, prefill }`; `503` without Razorpay keys | Razorpay Orders API + `sp_create_online_payment` |
+| POST | `/add-money/verify` | `orderId, paymentId, signature` | `{ txnId, status }` — no PIN; the signature is checked instead | `sp_complete_online_payment` |
 | POST 🔒 | `/withdraw` | `amount` | `201 { txnId, status }` — `PENDING` if > ₹50,000 | `sp_withdraw` |
 | GET | `/payee` | `?accountNumber&ifsc` | `{ payee }` (masked name, branch) | `fn_lookup_payee` |
 | POST 🔒 | `/transfer` | `accountNumber, ifsc, amount, remarks?` | `201 { txnId, status }` | `sp_transfer` |
@@ -65,6 +69,9 @@ One-page reference for the Bharat National Bank backend. Business rules live in 
 | POST 🔒 | `/transactions/:id/approve` | — | `{ status }` | `sp_approve_withdrawal` |
 | POST 🔒 | `/transactions/:id/reject` | `reason?` | `{ status }` | `sp_reject_withdrawal` |
 | POST 🔒 | `/transactions/:id/reverse` | `reason?` | `201 { reversalTxnId }` | `sp_reverse_transaction` |
+| GET | `/cheques` | `?status` (cheque_status) | `{ cheques }` | `v_cheque_deposits` |
+| POST 🔒 | `/cheques/:id/clear` | — | `{ status: CLEARED\|BOUNCED, creditTxnId }` | `sp_clear_cheque` |
+| POST 🔒 | `/cheques/:id/return` | `reason` (cheque_return_reason) | `{ status }` | `sp_bounce_cheque` |
 | GET | `/loans` | `?status` (loan_status) | `{ loans }` + current score, suggested rate | `v_loan_summary` |
 | POST 🔒 | `/loans/:id/sanction` | `rate?` (defaults to suggested) | `{ status, disbursalTxnId }` | `sp_sanction_loan` |
 | POST 🔒 | `/loans/:id/reject` | `reason?` | `{ status }` | `sp_reject_loan` |
@@ -90,6 +97,9 @@ SQL lives in `apps/server/db/sql/` and runs in order via `npm run db:setup`.
 | `txn_status` | PENDING, COMPLETED, REJECTED, REVERSED |
 | `loan_status` | PENDING, ACTIVE, REJECTED, CLOSED, DEFAULTED |
 | `due_status` | DUE, PAID, MISSED |
+| `cheque_status` | IN_CLEARING, CLEARED, BOUNCED |
+| `cheque_return_reason` | FUNDS_INSUFFICIENT, SIGNATURE_MISMATCH, AMOUNT_MISMATCH, STALE_CHEQUE, PAYMENT_STOPPED, ACCOUNT_FROZEN |
+| `online_payment_status` | CREATED, PAID |
 
 ### Relationships
 
@@ -101,6 +111,8 @@ users        1 ── * loans          (user_id)   loans * ── 1 accounts (ac
 loans        1 ── * transactions   (loan_id)
 loans        1 ── * loan_dues      (loan_id)   loan_dues 0..1 ── 1 transactions (paid_txn_id)
 transactions 1 ── 0..1 transactions (reversal_of)
+accounts     1 ── * cheque_deposits (account_id, drawer_account_id)   cheque_deposits 0..1 ── 1 transactions (credit_txn_id, debit_txn_id)
+accounts     1 ── * online_payments (account_id)   online_payments 0..1 ── 1 transactions (txn_id)
 users        1 ── * notices        (created_by, recipient_user_id)
 notices      * ── * users          via notice_reads
 ```
@@ -155,6 +167,32 @@ notices      * ── * users          via notice_reads
 | created_by, processed_by | uuid | FK users |
 | processed_at, posted_at, created_at, updated_at | timestamptz | posted_at set when COMPLETED / REVERSED |
 
+**cheque_deposits** — one presentation per cheque (partial unique index, bounced rows excluded)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | PK, identity from 700001 (clearing ref) |
+| account_id | uuid | FK accounts — the depositor |
+| cheque_no | char(6) | 6 digits |
+| cheque_date | date | not post-dated, not older than 3 months (checked on deposit) |
+| amount | numeric(14,2) | > 0 |
+| drawer_account_number, drawer_ifsc | text | 9–18 digits; valid IFSC |
+| drawer_account_id | uuid | FK accounts; set iff IFSC starts with BNBK; never the depositor |
+| status | cheque_status | default IN_CLEARING |
+| return_reason | cheque_return_reason | required iff BOUNCED |
+| credit_txn_id, debit_txn_id | bigint | FK transactions; set when CLEARED (debit only for this bank's cheques) |
+| submitted_by, decided_by, decided_at, created_at, updated_at | | |
+
+**online_payments** — Razorpay orders; unique order id, payment id and txn_id
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | PK |
+| account_id | uuid | FK accounts |
+| amount | numeric(14,2) | > 0, ≤ ₹1,00,000 (checked on create) |
+| gateway_order_id / gateway_payment_id | text | `order_…` / `pay_…` |
+| status | online_payment_status | PAID iff txn_id, payment id and paid_at set |
+| txn_id | bigint | FK transactions — the DEPOSIT |
+| created_by, paid_at, created_at, updated_at | | |
+
 **loans** — max one PENDING/ACTIVE per user (partial unique index)
 | Column | Type | Notes |
 |---|---|---|
@@ -188,7 +226,7 @@ notices      * ── * users          via notice_reads
 | created_by | uuid | FK users |
 | notice_reads (notice_id, user_id) | PK | read_at timestamptz |
 
-**audit_log** — written by triggers on accounts, loans, transactions
+**audit_log** — written by triggers on accounts, loans, transactions, cheque_deposits, online_payments
 `id, table_name, row_id, action (INSERT|UPDATE|DELETE), old_data jsonb, new_data jsonb, changed_by, changed_at`
 
 ### Views
@@ -199,6 +237,7 @@ notices      * ── * users          via notice_reads
 | `v_account_statement` | customer statement |
 | `v_admin_transactions` | admin transaction search |
 | `v_loan_summary` | customer and admin loan lists |
+| `v_cheque_deposits` | customer cheque list, admin clearing desk |
 
 ### Triggers
 
@@ -209,8 +248,8 @@ notices      * ── * users          via notice_reads
 | `trg_transactions_block_frozen` | blocks new transactions on FROZEN accounts |
 | `trg_transactions_immutable` | ledger rows can't be deleted or have amounts changed |
 | `trg_transactions_apply_balance` | updates `accounts.balance` when a row becomes COMPLETED |
-| `trg_{accounts,loans,transactions}_audit` | writes `audit_log` |
+| `trg_{accounts,loans,transactions,cheque_deposits,online_payments}_audit` | writes `audit_log` |
 
 ### Key functions
 
-`fn_luhn_check_digit`, `fn_is_valid_account_number`, `fn_generate_account_number`, `fn_is_valid_ifsc`, `fn_find_payee` / `fn_lookup_payee`, `fn_credit_score` / `fn_credit_score_breakdown`, `fn_suggested_rate`, `fn_withdrawal_approval_limit` (₹50,000), `fn_require_admin`.
+`fn_luhn_check_digit`, `fn_is_valid_account_number`, `fn_generate_account_number`, `fn_is_valid_ifsc`, `fn_find_payee` / `fn_lookup_payee`, `fn_credit_score` / `fn_credit_score_breakdown`, `fn_suggested_rate`, `fn_withdrawal_approval_limit` (₹50,000), `fn_online_payment_limit` (₹1,00,000), `fn_cheque_validity` (3 months), `fn_assert_can_add_money`, `fn_require_admin`.

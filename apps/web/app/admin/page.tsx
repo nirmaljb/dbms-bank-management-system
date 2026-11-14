@@ -9,11 +9,12 @@ import { apiGet, type AdminStats } from '../lib/api';
 import { OverviewSection } from './OverviewSection';
 import { CustomersSection } from './CustomersSection';
 import { TransactionsSection } from './TransactionsSection';
+import { ChequesSection } from './ChequesSection';
 import { LoansSection } from './LoansSection';
 import { NoticesSection } from './NoticesSection';
 import { ApplicationsSection } from './ApplicationsSection';
 
-type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'loans' | 'notices';
+type Tab = 'overview' | 'applications' | 'customers' | 'transactions' | 'cheques' | 'loans' | 'notices';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -49,6 +50,7 @@ export default function AdminPage() {
     { id: 'applications', label: '📝 Applications', badge: stats?.pending_applications || undefined },
     { id: 'customers', label: '👥 Customers' },
     { id: 'transactions', label: '🧾 Transactions', badge: stats?.pending_withdrawals || undefined },
+    { id: 'cheques', label: '🏦 Cheques', badge: stats?.cheques_in_clearing || undefined },
     { id: 'loans', label: '🤝 Loans', badge: stats?.pending_loans || undefined },
     { id: 'notices', label: '📨 Notices' },
   ];
@@ -77,6 +79,7 @@ export default function AdminPage() {
         {tab === 'applications' && <ApplicationsSection onChange={refreshStats} />}
         {tab === 'customers' && <CustomersSection onChange={refreshStats} />}
         {tab === 'transactions' && <TransactionsSection preset={txnPreset} onChange={refreshStats} />}
+        {tab === 'cheques' && <ChequesSection onChange={refreshStats} />}
         {tab === 'loans' && <LoansSection onChange={refreshStats} />}
         {tab === 'notices' && <NoticesSection />}
       </main>
